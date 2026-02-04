@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Beer?</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #f39c12;
+            --primary-dark: #d35400;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --bg-gradient: linear-gradient(135deg, #FF9966 0%, #FF5E62 100%);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-gradient);
+            overflow: hidden;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 60px 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        h1 {
+            margin: 0 0 40px;
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .buttons {
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+        }
+
+        button {
+            padding: 14px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #yes {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            /* z-index removed to prevent stacking context confusion, flex handles layout */
+        }
+
+        #yes:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+        }
+
+        #no {
+            background: var(--danger);
+            color: white;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+            transition: left 0.2s ease, top 0.2s ease;
+        }
+
+        #result {
+            margin-top: 30px;
+            font-weight: 600;
+            color: var(--success);
+            font-size: 1.1em;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease;
+        }
+
+        #result.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Emoji animation */
+        .emoji {
+            display: inline-block;
+            animation: wave 2s infinite;
+            transform-origin: 70% 70%;
+        }
+
+        @keyframes wave {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            10% {
+                transform: rotate(14deg);
+            }
+
+            20% {
+                transform: rotate(-8deg);
+            }
+
+            30% {
+                transform: rotate(14deg);
+            }
+
+            40% {
+                transform: rotate(-4deg);
+            }
+
+            50% {
+                transform: rotate(10deg);
+            }
+
+            60% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(0deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1 id="question">Hey there, want to grab a beer? <span class="emoji">🍺</span></h1>
+
+        <div class="buttons">
+            <button id="yes">Yes</button>
+            <button id="no">No</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // REPLACE THIS WITH YOUR GMAIL ADDRESS
+        const myEmail = "guedouaromar@gmail.com";
+
+        // --- LOGIC ---
+
+        // 1. Get name from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const friendName = urlParams.get('name') || "Buddy"; // Default to "Friend" if no name provided
+
+        // Update the question text
+        document.getElementById("question").innerHTML = `Hey ${friendName}, want to grab a beer? <span class="emoji">🍺</span>`;
+
+        const noBtn = document.getElementById("no");
+        const yesBtn = document.getElementById("yes");
+        const result = document.getElementById("result");
+
+        // Track scale for gamification
+        let yesScale = 1;
+        let noScale = 1;
+
+        // 2. "No" button evasion logic
+        // Center the 'No' button initially relative to the container for the demo, 
+        // but absolute positioning handles the movement.
+        // We set initial position to look good in the flex container
+        // actually, flexbox handles the initial render, but once we move it matches absolute.
+
+        // Set initial position explicitly so movement is relative to card
+        // Wait for layout
+        setTimeout(() => {
+            // Just let CSS handle initial layout, we only mess with it on hover
+        }, 0);
+
+        noBtn.addEventListener("mouseover", moveButton);
+        noBtn.addEventListener("touchstart", moveButton); // Mobile support
+
+        function moveButton() {
+            const card = document.querySelector('.card');
+            const cardRect = card.getBoundingClientRect();
+            const btnRect = noBtn.getBoundingClientRect();
+
+            // Calculate safe boundaries within the card
+            // Padding of card is 60px 40px, let's allow movement inside that
+            const paddingX = 40;
+            const paddingY = 60;
+
+            const maxX = cardRect.width - btnRect.width - paddingX;
+            const maxY = cardRect.height - btnRect.height - paddingY;
+            const minX = paddingX;
+            const minY = paddingY;
+
+            // Generate new position
+            const newX = Math.random() * (maxX - minX) + minX;
+            const newY = Math.random() * (maxY - minY) + minY;
+
+            // Switch to absolute positioning relative to the card
+            noBtn.style.position = 'absolute';
+            noBtn.style.left = `${newX}px`;
+            noBtn.style.top = `${newY}px`;
+
+            // Reset z-index if it was set
+            noBtn.style.zIndex = '';
+
+            // Update scales
+            yesScale += 0.2;
+            noScale = Math.max(0.1, noScale - 0.1); // Shrink No button but keep it barely visible
+
+            // Apply transforms
+            yesBtn.style.transform = `scale(${yesScale})`;
+            noBtn.style.transform = `scale(${noScale})`;
+        }
+
+        // 3. Gmail Integration
+        yesBtn.addEventListener("click", () => {
+            result.textContent = "Awesome! Email client opening... 🍻";
+            result.classList.add('visible');
+
+            const subject = encodeURIComponent("Beer Time! 🍻");
+            const body = encodeURIComponent(`Hey! I'm in for a beer. Let's go! \n\n- ${friendName}`);
+
+            // Open mailto link
+            setTimeout(() => {
+                window.location.href = `mailto:${myEmail}?subject=${subject}&body=${body}`;
+            }, 800);
+        });
+    </script>
+</body>
+
+</html>
