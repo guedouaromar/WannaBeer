@@ -90,6 +90,19 @@
             transition: left 0.2s ease, top 0.2s ease;
         }
 
+        #asba {
+            background: #3498db;
+            color: white;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            transition: transform 0.2s;
+        }
+
+        #asba:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
         #result {
             margin-top: 30px;
             font-weight: 600;
@@ -155,6 +168,7 @@
         <div class="buttons">
             <button id="yes">Yes</button>
             <button id="no">No</button>
+            <button id="asba">ASBA</button>
         </div>
 
         <div id="result"></div>
@@ -176,6 +190,7 @@
 
         const noBtn = document.getElementById("no");
         const yesBtn = document.getElementById("yes");
+        const asbaBtn = document.getElementById("asba");
         const result = document.getElementById("result");
 
         // Track scale for gamification
@@ -245,6 +260,11 @@
             setTimeout(() => {
                 window.location.href = `mailto:${myEmail}?subject=${subject}&body=${body}`;
             }, 800);
+        });
+
+        // 4. ASBA Button Logic
+        asbaBtn.addEventListener("click", () => {
+            alert("ASBA!");
         });
     </script>
 </body>
