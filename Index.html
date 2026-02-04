@@ -90,18 +90,7 @@
             transition: left 0.2s ease, top 0.2s ease;
         }
 
-        #asba {
-            background: #3498db;
-            color: white;
-            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-            transition: transform 0.2s;
-        }
 
-        #asba:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-        }
 
         #result {
             margin-top: 30px;
@@ -168,7 +157,6 @@
         <div class="buttons">
             <button id="yes">Yes</button>
             <button id="no">No</button>
-            <button id="asba">ASBA</button>
         </div>
 
         <div id="result"></div>
@@ -190,7 +178,6 @@
 
         const noBtn = document.getElementById("no");
         const yesBtn = document.getElementById("yes");
-        const asbaBtn = document.getElementById("asba");
         const result = document.getElementById("result");
 
         // Track scale for gamification
@@ -227,7 +214,7 @@
             const minX = paddingX;
             const minY = paddingY;
 
-            // Generate new position
+            // Generate new position blqblq
             const newX = Math.random() * (maxX - minX) + minX;
             const newY = Math.random() * (maxY - minY) + minY;
 
@@ -248,9 +235,20 @@
             noBtn.style.transform = `scale(${noScale})`;
         }
 
-        // 3. Gmail Integration asba kbira 
         yesBtn.addEventListener("click", () => {
-            result.textContent = "Awesome! Email client opening... 🍻";
+            result.textContent = "Cool, call me when you're done!";
+
+            // Adjust color if button is large and likely overlapping text
+            if (yesScale > 1.8) {
+                result.style.color = "white";
+                result.style.textShadow = "0 2px 4px rgba(0,0,0,0.5)";
+                result.style.position = "relative";
+                result.style.zIndex = "20";
+            } else {
+                result.style.color = ""; // Reset to default
+                result.style.textShadow = "";
+            }
+
             result.classList.add('visible');
 
             const subject = encodeURIComponent("Beer Time! 🍻");
@@ -262,10 +260,7 @@
             }, 800);
         });
 
-        // 4. ASBA Button Logic
-        asbaBtn.addEventListener("click", () => {
-            alert("ASBA!");
-        });
+
     </script>
 </body>
 
