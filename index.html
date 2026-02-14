@@ -4,15 +4,17 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Beer?</title>
+    <title>Be my Valentine?</title>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --primary: #f39c12;
-            --primary-dark: #d35400;
-            --success: #2ecc71;
-            --danger: #e74c3c;
-            --bg-gradient: linear-gradient(135deg, #FF9966 0%, #FF5E62 100%);
+            --primary: #ff5e8e;
+            --primary-dark: #e84373;
+            --success: #ff5e8e;
+            --danger: #ff7675;
+            --bg-gradient: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
         }
 
         body {
@@ -27,15 +29,14 @@
         }
 
         .card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.96);
             backdrop-filter: blur(10px);
             padding: 60px 40px;
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            border-radius: 28px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
             text-align: center;
             width: 90%;
             max-width: 600px;
-            transition: all 0.3s ease;
             position: relative;
         }
 
@@ -48,21 +49,21 @@
         }
 
         .buttons {
-            height: 80px;
+            height: 90px;
             display: flex;
             justify-content: center;
             gap: 50px;
+            position: relative;
         }
 
         button {
-            padding: 14px 32px;
+            padding: 14px 34px;
             font-size: 18px;
             font-weight: 600;
             border: none;
-            border-radius: 12px;
+            border-radius: 14px;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            outline: none;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -73,30 +74,26 @@
         #yes {
             background: var(--success);
             color: white;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
-            /* z-index removed to prevent stacking context confusion, flex handles layout */
+            box-shadow: 0 6px 18px rgba(255, 94, 142, 0.35);
         }
 
         #yes:hover {
-            background: #27ae60;
+            background: var(--primary-dark);
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
         }
 
         #no {
             background: var(--danger);
             color: white;
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+            box-shadow: 0 6px 18px rgba(231, 76, 60, 0.35);
             transition: left 0.2s ease, top 0.2s ease;
         }
 
-
-
         #result {
             margin-top: 30px;
-            font-weight: 600;
-            color: var(--success);
-            font-size: 1.1em;
+            font-weight: 700;
+            font-size: 1.15em;
+            color: #e84393;
             opacity: 0;
             transform: translateY(10px);
             transition: all 0.5s ease;
@@ -107,161 +104,133 @@
             transform: translateY(0);
         }
 
-        /* Emoji animation */
         .emoji {
             display: inline-block;
-            animation: wave 2s infinite;
-            transform-origin: 70% 70%;
+            animation: float 2s ease-in-out infinite;
         }
 
-        @keyframes wave {
+        @keyframes float {
             0% {
-                transform: rotate(0deg);
-            }
-
-            10% {
-                transform: rotate(14deg);
-            }
-
-            20% {
-                transform: rotate(-8deg);
-            }
-
-            30% {
-                transform: rotate(14deg);
-            }
-
-            40% {
-                transform: rotate(-4deg);
+                transform: translateY(0);
             }
 
             50% {
-                transform: rotate(10deg);
-            }
-
-            60% {
-                transform: rotate(0deg);
+                transform: translateY(-6px);
             }
 
             100% {
-                transform: rotate(0deg);
+                transform: translateY(0);
             }
         }
     </style>
 </head>
 
 <body>
+
     <div class="card">
-        <h1 id="question">Hey there, want to grab a beer? <span class="emoji">🍺</span></h1>
+        <h1 id="question">
+            Hey you… will you be my Valentine? <span class="emoji">💖</span>
+        </h1>
 
         <div class="buttons">
-            <button id="yes">Yes</button>
-            <button id="no">No</button>
+            <button id="yes">Yes 💘</button>
+            <button id="no">No 🙈</button>
         </div>
 
         <div id="result"></div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        // REPLACE THIS WITH YOUR GMAIL ADDRESS
+        // --- CONFIG ---
         const myEmail = "guedouaromar@gmail.com";
+        const defaultName = "Assma"; // Configurable default name
 
-        // --- LOGIC ---
+        // --- NAME FROM URL ---
+        const params = new URLSearchParams(window.location.search);
+        const name = params.get("name") || defaultName;
 
-        // 1. Get name from URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const friendName = urlParams.get('name') || "Buddy"; // Default to "Friend" if no name provided
+        document.getElementById("question").innerHTML =
+            `Hey ${name}… will you be my Valentine? <span class="emoji">💖</span>`;
 
-        // Update the question text
-        document.getElementById("question").innerHTML = `Hey ${friendName}, want to grab a beer? <span class="emoji">🍺</span>`;
-
-        const noBtn = document.getElementById("no");
         const yesBtn = document.getElementById("yes");
+        const noBtn = document.getElementById("no");
         const result = document.getElementById("result");
 
-        // Track scale for gamification
         let yesScale = 1;
         let noScale = 1;
 
-        // 2. "No" button evasion logic
-        // Center the 'No' button initially relative to the container for the demo, 
-        // but absolute positioning handles the movement.
-        // We set initial position to look good in the flex container
-        // actually, flexbox handles the initial render, but once we move it matches absolute.
+        // --- NO BUTTON ESCAPE ---
+        noBtn.addEventListener("mouseover", moveNo);
+        noBtn.addEventListener("touchstart", moveNo);
+        noBtn.addEventListener("click", moveNo); // Also triggers on click
 
-        // Set initial position explicitly so movement is relative to card
-        // Wait for layout
-        setTimeout(() => {
-            // Just let CSS handle initial layout, we only mess with it on hover
-        }, 0);
-
-        noBtn.addEventListener("mouseover", moveButton);
-        noBtn.addEventListener("touchstart", moveButton); // Mobile support
-
-        function moveButton() {
-            const card = document.querySelector('.card');
+        function moveNo() {
+            const card = document.querySelector(".card");
             const cardRect = card.getBoundingClientRect();
             const btnRect = noBtn.getBoundingClientRect();
 
-            // Calculate safe boundaries within the card
-            // Padding of card is 60px 40px, let's allow movement inside that
-            const paddingX = 40;
-            const paddingY = 60;
+            // Calculate boundaries within the card
+            const padding = 20;
+            const maxX = cardRect.width - btnRect.width - padding;
+            const maxY = cardRect.height - btnRect.height - padding;
 
-            const maxX = cardRect.width - btnRect.width - paddingX;
-            const maxY = cardRect.height - btnRect.height - paddingY;
-            const minX = paddingX;
-            const minY = paddingY;
+            // Current position (relative to card content box)
+            const currentX = noBtn.offsetLeft;
+            const currentY = noBtn.offsetTop;
 
-            // Generate new position blqblq
-            const newX = Math.random() * (maxX - minX) + minX;
-            const newY = Math.random() * (maxY - minY) + minY;
+            let newX, newY, distance;
+            const minDistance = 100; // Ensure it jumps far enough
+            let attempts = 0;
 
-            // Switch to absolute positioning relative to the card
-            noBtn.style.position = 'absolute';
+            // Try to find a position far enough away
+            do {
+                newX = Math.random() * maxX;
+                newY = Math.random() * maxY;
+
+                const dx = newX - currentX;
+                const dy = newY - currentY;
+                distance = Math.sqrt(dx * dx + dy * dy);
+                attempts++;
+            } while (distance < minDistance && attempts < 15);
+
+            noBtn.style.position = "absolute"; // Constrained to card
             noBtn.style.left = `${newX}px`;
             noBtn.style.top = `${newY}px`;
 
-            // Reset z-index if it was set
-            noBtn.style.zIndex = '';
-
-            // Update scales
             yesScale += 0.2;
-            noScale = Math.max(0.1, noScale - 0.1); // Shrink No button but keep it barely visible
+            noScale = Math.max(0.1, noScale - 0.1);
 
-            // Apply transforms
             yesBtn.style.transform = `scale(${yesScale})`;
             noBtn.style.transform = `scale(${noScale})`;
         }
 
-        yesBtn.addEventListener("click", () => {
-            result.textContent = "Cool, call me when you're done!";
+        // --- YES CLICK ---
 
-            // Adjust color if button is large and likely overlapping text
+        yesBtn.addEventListener("click", () => {
+            result.textContent = `${name}, you just made my day! See you soon 😘`;
+
+            // Dynamic color check
             if (yesScale > 1.8) {
                 result.style.color = "white";
                 result.style.textShadow = "0 2px 4px rgba(0,0,0,0.5)";
-                result.style.position = "relative";
-                result.style.zIndex = "20";
             } else {
-                result.style.color = ""; // Reset to default
-                result.style.textShadow = "";
+                result.style.color = "#e84393";
             }
 
-            result.classList.add('visible');
+            result.classList.add("visible");
 
-            const subject = encodeURIComponent("Beer Time! 🍻");
-            const body = encodeURIComponent(`Hey! I'm in for a beer. Let's go! \n\n- ${friendName}`);
+            const subject = encodeURIComponent("My Valentine 💖");
+            const body = encodeURIComponent(
+                `It's a yes 💘\n\nCan't wait to see you.\n\n— ${name}`
+            );
 
-            // Open mailto link
-            // setTimeout(() => {
-            //     window.location.href = `mailto:${myEmail}?subject=${subject}&body=${body}`;
-            // }, 800);
+            // Optional email trigger
+            setTimeout(() => {
+                window.location.href = `mailto:${myEmail}?subject=${subject}&body=${body}`;
+            }, 1000);
         });
-
-
     </script>
+
 </body>
 
 </html>
