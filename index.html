@@ -6,46 +6,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Beer?</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
         :root {
             --primary: #f39c12;
             --primary-dark: #d35400;
             --success: #2ecc71;
             --danger: #e74c3c;
+            --ink: #2c3e50;
+            --muted: #7f8c8d;
             --bg-gradient: linear-gradient(135deg, #FF9966 0%, #FF5E62 100%);
         }
 
+        * { box-sizing: border-box; }
+
         body {
             font-family: 'Inter', sans-serif;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             background: var(--bg-gradient);
-            overflow: hidden;
+            padding: 16px;
+            color: var(--ink);
         }
 
         .card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            padding: 60px 40px;
+            padding: 48px 32px;
             border-radius: 24px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
             text-align: center;
-            width: 90%;
-            max-width: 600px;
-            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 640px;
             position: relative;
+            overflow: hidden;
         }
 
+        .card.wide { max-width: 760px; text-align: left; padding: 32px 28px; }
+
         h1 {
-            margin: 0 0 40px;
-            color: #2c3e50;
+            margin: 0 0 32px;
             font-size: 28px;
             font-weight: 800;
             line-height: 1.3;
         }
+
+        h2 { font-size: 20px; margin: 0 0 8px; }
+        p.sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
 
         .buttons {
             height: 80px;
@@ -55,6 +65,7 @@
         }
 
         button {
+            font-family: inherit;
             padding: 14px 32px;
             font-size: 18px;
             font-weight: 600;
@@ -65,23 +76,15 @@
             outline: none;
             -webkit-tap-highlight-color: transparent;
         }
-
-        button:active {
-            transform: scale(0.95);
-        }
+        button:active { transform: scale(0.95); }
+        button:disabled { opacity: .55; cursor: default; }
 
         #yes {
             background: var(--success);
             color: white;
             box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
-            /* z-index removed to prevent stacking context confusion, flex handles layout */
         }
-
-        #yes:hover {
-            background: #27ae60;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
-        }
+        #yes:hover { background: #27ae60; transform: translateY(-2px); }
 
         #no {
             background: var(--danger);
@@ -90,177 +93,534 @@
             transition: left 0.2s ease, top 0.2s ease;
         }
 
+        .btn { background: var(--primary); color: #fff; font-size: 16px; padding: 12px 22px; }
+        .btn:hover { background: var(--primary-dark); }
+        .btn.ghost { background: #eef1f4; color: var(--ink); }
+        .btn.small { font-size: 13px; padding: 8px 14px; border-radius: 9px; }
 
-
-        #result {
-            margin-top: 30px;
-            font-weight: 600;
-            color: var(--success);
-            font-size: 1.1em;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.5s ease;
+        input[type=text] {
+            font-family: inherit;
+            font-size: 16px;
+            padding: 12px 14px;
+            border: 2px solid #e1e5ea;
+            border-radius: 12px;
+            width: 100%;
         }
+        input[type=text]:focus { border-color: var(--primary); outline: none; }
 
-        #result.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .field { margin: 14px 0; text-align: left; }
+        .field label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+        .check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
-        /* Emoji animation */
-        .emoji {
-            display: inline-block;
-            animation: wave 2s infinite;
-            transform-origin: 70% 70%;
-        }
+        .status { font-size: 14px; color: var(--muted); margin-top: 10px; min-height: 18px; }
+        .status.ok { color: #27ae60; }
+        .status.err { color: var(--danger); }
 
+        .hidden { display: none !important; }
+
+        .emoji { display: inline-block; animation: wave 2s infinite; transform-origin: 70% 70%; }
         @keyframes wave {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            10% {
-                transform: rotate(14deg);
-            }
-
-            20% {
-                transform: rotate(-8deg);
-            }
-
-            30% {
-                transform: rotate(14deg);
-            }
-
-            40% {
-                transform: rotate(-4deg);
-            }
-
-            50% {
-                transform: rotate(10deg);
-            }
-
-            60% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(0deg);
-            }
+            0% { transform: rotate(0deg); } 10% { transform: rotate(14deg); } 20% { transform: rotate(-8deg); }
+            30% { transform: rotate(14deg); } 40% { transform: rotate(-4deg); } 50% { transform: rotate(10deg); }
+            60% { transform: rotate(0deg); } 100% { transform: rotate(0deg); }
         }
+
+        /* Plan view */
+        #map { height: 300px; border-radius: 16px; margin: 14px 0; border: 2px solid #eef1f4; }
+        .people { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+        .pill {
+            background: #fff3e0; border: 1px solid #ffd9a8; color: #8a4b08;
+            border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600;
+        }
+        .pill.waiting { background: #f1f3f5; border-color: #dfe3e8; color: var(--muted); font-weight: 400; }
+
+        .bar {
+            border: 2px solid #eef1f4; border-radius: 16px; padding: 14px 16px; margin: 10px 0;
+            transition: border-color .2s;
+        }
+        .bar.top { border-color: var(--primary); background: #fffaf3; }
+        .bar h3 { margin: 0 0 4px; font-size: 17px; }
+        .bar .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+        .legs { display: grid; grid-template-columns: 1fr; gap: 6px; }
+        .leg { display: flex; justify-content: space-between; align-items: center; font-size: 14px; gap: 8px; flex-wrap: wrap; }
+        .leg .who { font-weight: 600; }
+        .leg .modes { color: var(--muted); font-size: 13px; }
+        .leg .modes b { color: var(--ink); }
+        .leg a { color: var(--primary-dark); font-weight: 600; text-decoration: none; font-size: 13px; white-space: nowrap; }
+        .rank { float: right; font-size: 12px; font-weight: 700; color: var(--primary-dark); background: #ffe8c7; padding: 3px 8px; border-radius: 8px; }
+
+        .link-box {
+            background: #f6f7f9; border-radius: 12px; padding: 12px; font-size: 13px;
+            word-break: break-all; text-align: left; margin-top: 12px;
+        }
+        .footer-note { font-size: 12px; color: var(--muted); margin-top: 18px; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ddd; border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 
 <body>
-    <div class="card">
-        <h1 id="question">Hey there, want to grab a beer? <span class="emoji">🍺</span></h1>
+    <!-- ───────────── HOME: create an invite ───────────── -->
+    <div class="card" id="screen-home">
+        <h1>Wanna beer? <span class="emoji">🍺</span></h1>
+        <p class="sub">Invite people, everyone shares where they are, and we find a bar that's fair for all — by bike or metro.</p>
+        <div class="field">
+            <label>Your name</label>
+            <input type="text" id="host-name" placeholder="Omar" maxlength="40" />
+        </div>
+        <div class="field">
+            <label>Who are you asking? (optional, personalises the invite)</label>
+            <input type="text" id="friend-name" placeholder="Karim" maxlength="40" />
+        </div>
+        <div class="field check">
+            <input type="checkbox" id="host-bike" checked /> <label for="host-bike" style="margin:0">I can cycle</label>
+        </div>
+        <div class="row" style="justify-content:center">
+            <button class="btn" id="host-create">📍 Use my location & create invite</button>
+        </div>
+        <div class="status" id="host-status"></div>
+        <div id="host-link" class="hidden">
+            <div class="link-box" id="host-link-text"></div>
+            <div class="row" style="justify-content:center; margin-top:10px">
+                <button class="btn small ghost" id="copy-link">Copy link</button>
+                <button class="btn small ghost" id="share-link">Share…</button>
+                <button class="btn small" id="open-plan">Open the plan →</button>
+            </div>
+        </div>
+        <p class="footer-note" id="mode-note"></p>
+    </div>
 
+    <!-- ───────────── INVITE: the original Yes / runaway No ───────────── -->
+    <div class="card hidden" id="screen-invite">
+        <h1 id="question">Hey there, want to grab a beer? <span class="emoji">🍺</span></h1>
         <div class="buttons">
             <button id="yes">Yes</button>
             <button id="no">No</button>
         </div>
-
         <div id="result"></div>
     </div>
 
+    <!-- ───────────── JOIN: share location ───────────── -->
+    <div class="card hidden" id="screen-join">
+        <h1>Great! 🍻 Where are you?</h1>
+        <p class="sub">We'll suggest a bar that's fair for everyone. Your location is only used to compute the meeting point.</p>
+        <div class="field">
+            <label>Your name</label>
+            <input type="text" id="join-name" placeholder="Your name" maxlength="40" />
+        </div>
+        <div class="field check">
+            <input type="checkbox" id="join-bike" checked /> <label for="join-bike" style="margin:0">I can cycle</label>
+        </div>
+        <div class="row" style="justify-content:center">
+            <button class="btn" id="join-go">📍 Share my location</button>
+        </div>
+        <div class="status" id="join-status"></div>
+    </div>
+
+    <!-- ───────────── PLAN: participants + suggestions ───────────── -->
+    <div class="card wide hidden" id="screen-plan">
+        <h2 id="plan-title">Beer plan 🍻</h2>
+        <p class="sub" id="plan-sub">Waiting for people to say yes…</p>
+        <div class="people" id="people"></div>
+        <div id="map"></div>
+        <div class="row" style="justify-content:space-between">
+            <div class="status" id="plan-status"></div>
+            <div class="row">
+                <button class="btn small ghost" id="plan-copy">Copy invite link</button>
+                <button class="btn small ghost" id="plan-refresh">↻ Refresh</button>
+            </div>
+        </div>
+        <div id="bars"></div>
+        <p class="footer-note">Travel times are estimates (bike / metro / walk) from OpenStreetMap data. Tap "Route" for turn-by-turn directions.</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="config.js"></script>
     <script>
-        // --- CONFIGURATION ---
-        // REPLACE THIS WITH YOUR GMAIL ADDRESS
-        const myEmail = "guedouaromar@gmail.com";
+        // ═══════════════════════ SETUP ═══════════════════════
+        const CFG = Object.assign({
+            SUPABASE_URL: "", SUPABASE_ANON_KEY: "", ORS_KEY: "",
+            BIKE_KMH: 15, WALK_KMH: 4.8, METRO_KMH: 32, DETOUR: 1.3,
+            METRO_WAIT_MIN: 4, METRO_TRANSFER_MIN: 5, MAX_WALK_TO_STATION_M: 1200,
+        }, window.WANNABEER_CONFIG || {});
 
-        // --- LOGIC ---
+        const params = new URLSearchParams(location.search);
+        const $ = (id) => document.getElementById(id);
+        const show = (id) => {
+            ["screen-home", "screen-invite", "screen-join", "screen-plan"].forEach(s => $(s).classList.add("hidden"));
+            $(id).classList.remove("hidden");
+        };
+        const setStatus = (id, msg, cls = "") => { const el = $(id); el.textContent = msg; el.className = "status " + cls; };
+        const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-        // 1. Get name from URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const friendName = urlParams.get('name') || "Buddy"; // Default to "Friend" if no name provided
+        // ═══════════════════════ STORAGE (Supabase or link-only) ═══════════════════════
+        const hasSupabase = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase);
+        const sb = hasSupabase ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 
-        // Update the question text
-        document.getElementById("question").innerHTML = `Hey ${friendName}, want to grab a beer? <span class="emoji">🍺</span>`;
+        // participant: { id, name, lat, lng, bike }
+        const b64e = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const b64d = (s) => { try { return JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))))); } catch { return null; } };
 
-        const noBtn = document.getElementById("no");
-        const yesBtn = document.getElementById("yes");
-        const result = document.getElementById("result");
+        const store = {
+            // returns plan id (Supabase) or encoded payload (link mode)
+            async createPlan(host) {
+                if (hasSupabase) {
+                    const { data: plan, error } = await sb.from("plans").insert({ host_name: host.name }).select().single();
+                    if (error) throw error;
+                    await this.join(plan.id, host);
+                    return plan.id;
+                }
+                return b64e({ h: [host] });
+            },
+            async join(planId, p) {
+                if (hasSupabase) {
+                    const { data, error } = await sb.from("participants")
+                        .insert({ plan_id: planId, name: p.name, lat: p.lat, lng: p.lng, bike: p.bike }).select().single();
+                    if (error) throw error;
+                    return data.id;
+                }
+                // link mode: append to in-memory list and rewrite URL so it can be re-shared
+                const s = b64d(planId) || { h: [] };
+                p.id = "local-" + Date.now();
+                s.h.push(p);
+                const url = new URL(location.href);
+                url.searchParams.set("plan", b64e(s));
+                history.replaceState(null, "", url.toString());
+                return p.id;
+            },
+            async list(planId) {
+                if (hasSupabase) {
+                    const { data, error } = await sb.from("participants")
+                        .select("id,name,lat,lng,bike,created_at").eq("plan_id", planId).order("created_at");
+                    if (error) throw error;
+                    return data;
+                }
+                const s = b64d(new URLSearchParams(location.search).get("plan")) || { h: [] };
+                return s.h;
+            },
+            async hostName(planId) {
+                if (hasSupabase) {
+                    const { data } = await sb.from("plans").select("host_name").eq("id", planId).single();
+                    return data ? data.host_name : null;
+                }
+                const s = b64d(planId); return s && s.h[0] ? s.h[0].name : null;
+            }
+        };
 
-        // Track scale for gamification
-        let yesScale = 1;
-        let noScale = 1;
+        // ═══════════════════════ GEO HELPERS ═══════════════════════
+        const R = 6371000;
+        function haversine(a, b) {
+            const toRad = (d) => d * Math.PI / 180;
+            const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+            const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(s)); // metres
+        }
+        const minutes = (metres, kmh) => (metres * CFG.DETOUR / 1000) / kmh * 60;
 
-        // 2. "No" button evasion logic
-        // Center the 'No' button initially relative to the container for the demo, 
-        // but absolute positioning handles the movement.
-        // We set initial position to look good in the flex container
-        // actually, flexbox handles the initial render, but once we move it matches absolute.
+        function getLocation() {
+            return new Promise((res, rej) => {
+                if (!navigator.geolocation) return rej(new Error("Geolocation not supported by this browser."));
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => res({ lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5) }),
+                    (err) => rej(new Error(err.code === 1 ? "Location permission denied. Allow location and try again." : "Couldn't get your location. Try again.")),
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+            });
+        }
 
-        // Set initial position explicitly so movement is relative to card
-        // Wait for layout
-        setTimeout(() => {
-            // Just let CSS handle initial layout, we only mess with it on hover
-        }, 0);
+        // ═══════════════════════ OPENSTREETMAP (bars + metro stations) ═══════════════════════
+        const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+        let osmCache = null; // { key, bars, stations }
 
-        noBtn.addEventListener("mouseover", moveButton);
-        noBtn.addEventListener("touchstart", moveButton); // Mobile support
+        async function fetchOSM(center, barRadius, stationRadius) {
+            const key = `${center.lat.toFixed(3)},${center.lng.toFixed(3)},${Math.round(barRadius)},${Math.round(stationRadius)}`;
+            if (osmCache && osmCache.key === key) return osmCache;
+            const q = `[out:json][timeout:25];
+(
+  nwr["amenity"~"^(bar|pub|biergarten)$"](around:${Math.round(barRadius)},${center.lat},${center.lng});
+  node["station"="subway"](around:${Math.round(stationRadius)},${center.lat},${center.lng});
+  node["railway"="station"]["subway"="yes"](around:${Math.round(stationRadius)},${center.lat},${center.lng});
+  node["station"="light_rail"](around:${Math.round(stationRadius)},${center.lat},${center.lng});
+);
+out center tags;`;
+            let lastErr;
+            for (const url of OVERPASS) {
+                try {
+                    const r = await fetch(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+                    if (!r.ok) throw new Error("Overpass " + r.status);
+                    const json = await r.json();
+                    const bars = [], stations = [], seenSt = new Set();
+                    for (const el of json.elements) {
+                        const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
+                        if (lat == null) continue;
+                        const t = el.tags || {};
+                        if (/^(bar|pub|biergarten)$/.test(t.amenity || "")) {
+                            if (!t.name) continue;
+                            bars.push({ id: el.type + el.id, name: t.name, kind: t.amenity, lat, lng, tags: t });
+                        } else {
+                            const nm = t.name || "Station";
+                            const k = nm + Math.round(lat * 500) + Math.round(lng * 500); // dedupe entrances/platforms
+                            if (seenSt.has(k)) continue; seenSt.add(k);
+                            stations.push({ name: nm, lat, lng });
+                        }
+                    }
+                    osmCache = { key, bars, stations };
+                    return osmCache;
+                } catch (e) { lastErr = e; }
+            }
+            throw lastErr || new Error("Could not reach OpenStreetMap.");
+        }
 
+        // ═══════════════════════ TRAVEL MODEL ═══════════════════════
+        function nearestStation(pt, stations) {
+            let best = null, bd = Infinity;
+            for (const s of stations) { const d = haversine(pt, s); if (d < bd) { bd = d; best = s; } }
+            return best && bd <= CFG.MAX_WALK_TO_STATION_M ? { st: best, d: bd } : null;
+        }
+
+        // returns { bike, metro, walk, best, bestMode } in minutes
+        function travel(person, bar, stations) {
+            const d = haversine(person, bar);
+            const walk = minutes(d, CFG.WALK_KMH) + 1;
+            const bike = person.bike ? minutes(d, CFG.BIKE_KMH) + 2 : null; // +2 min lock/unlock
+            let metro = null;
+            const s1 = nearestStation(person, stations), s2 = nearestStation(bar, stations);
+            if (s1 && s2 && s1.st !== s2.st) {
+                const ride = haversine(s1.st, s2.st) * 1.25 / 1000 / CFG.METRO_KMH * 60;
+                metro = minutes(s1.d, CFG.WALK_KMH) + CFG.METRO_WAIT_MIN + CFG.METRO_TRANSFER_MIN + ride + minutes(s2.d, CFG.WALK_KMH);
+                metro = { min: metro, from: s1.st.name, to: s2.st.name };
+            }
+            const opts = [["walk", walk], ["bike", bike], ["metro", metro ? metro.min : null]].filter(o => o[1] != null);
+            opts.sort((a, b) => a[1] - b[1]);
+            return { walk, bike, metro, best: opts[0][1], bestMode: opts[0][0] };
+        }
+
+        function rankBars(people, bars, stations) {
+            const scored = bars.map(bar => {
+                const legs = people.map(p => ({ person: p, t: travel(p, bar, stations) }));
+                const worst = Math.max(...legs.map(l => l.t.best));
+                const sum = legs.reduce((a, l) => a + l.t.best, 0);
+                return { bar, legs, worst, sum };
+            });
+            scored.sort((a, b) => (a.worst - b.worst) || (a.sum - b.sum));
+            return scored;
+        }
+
+        // Optional: refine top results with real cycling times from OpenRouteService
+        async function refineWithORS(top, people) {
+            if (!CFG.ORS_KEY) return top;
+            try {
+                const cyclists = people.filter(p => p.bike);
+                if (!cyclists.length) return top;
+                const locs = [...cyclists.map(p => [p.lng, p.lat]), ...top.map(t => [t.bar.lng, t.bar.lat])];
+                const r = await fetch("https://api.openrouteservice.org/v2/matrix/cycling-regular", {
+                    method: "POST", headers: { "Authorization": CFG.ORS_KEY, "Content-Type": "application/json" },
+                    body: JSON.stringify({ locations: locs, sources: cyclists.map((_, i) => i), destinations: top.map((_, i) => cyclists.length + i), metrics: ["duration"] })
+                });
+                if (!r.ok) return top;
+                const { durations } = await r.json();
+                top.forEach((t, j) => t.legs.forEach(l => {
+                    const i = cyclists.indexOf(l.person);
+                    if (i < 0 || durations[i][j] == null) return;
+                    l.t.bike = durations[i][j] / 60 + 2;
+                    const opts = [["walk", l.t.walk], ["bike", l.t.bike], ["metro", l.t.metro ? l.t.metro.min : null]].filter(o => o[1] != null).sort((a, b) => a[1] - b[1]);
+                    l.t.best = opts[0][1]; l.t.bestMode = opts[0][0];
+                }));
+                top.forEach(t => { t.worst = Math.max(...t.legs.map(l => l.t.best)); t.sum = t.legs.reduce((a, l) => a + l.t.best, 0); });
+                top.sort((a, b) => (a.worst - b.worst) || (a.sum - b.sum));
+            } catch { /* keep estimates */ }
+            return top;
+        }
+
+        // ═══════════════════════ FLOWS ═══════════════════════
+        const planId = params.get("plan");
+        const myKey = (id) => "wannabeer:" + id;
+        const joinedId = planId ? localStorage.getItem(myKey(planId)) : null;
+
+        function inviteURL(id, friend) {
+            const u = new URL(location.href.split("?")[0]);
+            u.searchParams.set("plan", id);
+            if (friend) u.searchParams.set("name", friend);
+            return u.toString();
+        }
+        async function copyText(txt, btn) {
+            try { await navigator.clipboard.writeText(txt); const o = btn.textContent; btn.textContent = "Copied ✓"; setTimeout(() => btn.textContent = o, 1500); }
+            catch { prompt("Copy this link:", txt); }
+        }
+
+        $("mode-note").textContent = hasSupabase
+            ? "Group mode: everyone who says yes appears live."
+            : "Link-only mode (no server configured): works 1-on-1 — the friend's phone computes the meeting point. Add Supabase keys in config.js for groups.";
+
+        // ── HOME ──
+        $("host-create").addEventListener("click", async () => {
+            const name = $("host-name").value.trim();
+            if (!name) return setStatus("host-status", "Tell us your name first.", "err");
+            $("host-create").disabled = true;
+            setStatus("host-status", "Getting your location…");
+            try {
+                const loc = await getLocation();
+                setStatus("host-status", "Creating your invite…");
+                const id = await store.createPlan({ name, lat: loc.lat, lng: loc.lng, bike: $("host-bike").checked });
+                const link = inviteURL(id, $("friend-name").value.trim());
+                localStorage.setItem(myKey(id), "host");
+                $("host-link-text").textContent = link;
+                $("host-link").classList.remove("hidden");
+                setStatus("host-status", "Send this link. When they say yes, the plan updates.", "ok");
+                $("copy-link").onclick = () => copyText(link, $("copy-link"));
+                $("share-link").onclick = () => navigator.share ? navigator.share({ title: "Beer?", text: `${name} wants to grab a beer 🍺`, url: link }) : copyText(link, $("share-link"));
+                $("open-plan").onclick = () => { const u = new URL(location.href.split("?")[0]); u.searchParams.set("plan", id); u.searchParams.set("view", "1"); location.href = u.toString(); };
+            } catch (e) { setStatus("host-status", e.message, "err"); }
+            $("host-create").disabled = false;
+        });
+
+        // ── INVITE (original game) ──
+        const noBtn = $("no"), yesBtn = $("yes"), result = $("result");
+        let yesScale = 1, noScale = 1;
         function moveButton() {
-            const card = document.querySelector('.card');
-            const cardRect = card.getBoundingClientRect();
-            const btnRect = noBtn.getBoundingClientRect();
-
-            // Calculate safe boundaries within the card
-            // Padding of card is 60px 40px, let's allow movement inside that
-            const paddingX = 40;
-            const paddingY = 60;
-
-            const maxX = cardRect.width - btnRect.width - paddingX;
-            const maxY = cardRect.height - btnRect.height - paddingY;
-            const minX = paddingX;
-            const minY = paddingY;
-
-            // Generate new position blqblq
-            const newX = Math.random() * (maxX - minX) + minX;
-            const newY = Math.random() * (maxY - minY) + minY;
-
-            // Switch to absolute positioning relative to the card
-            noBtn.style.position = 'absolute';
-            noBtn.style.left = `${newX}px`;
-            noBtn.style.top = `${newY}px`;
-
-            // Reset z-index if it was set
-            noBtn.style.zIndex = '';
-
-            // Update scales
-            yesScale += 0.2;
-            noScale = Math.max(0.1, noScale - 0.1); // Shrink No button but keep it barely visible
-
-            // Apply transforms
+            const card = $("screen-invite"), cardRect = card.getBoundingClientRect(), btnRect = noBtn.getBoundingClientRect();
+            const paddingX = 40, paddingY = 60;
+            const maxX = cardRect.width - btnRect.width - paddingX, maxY = cardRect.height - btnRect.height - paddingY;
+            noBtn.style.position = "absolute";
+            noBtn.style.left = `${Math.random() * (maxX - paddingX) + paddingX}px`;
+            noBtn.style.top = `${Math.random() * (maxY - paddingY) + paddingY}px`;
+            yesScale += 0.2; noScale = Math.max(0.1, noScale - 0.1);
             yesBtn.style.transform = `scale(${yesScale})`;
             noBtn.style.transform = `scale(${noScale})`;
         }
-
+        noBtn.addEventListener("mouseover", moveButton);
+        noBtn.addEventListener("touchstart", moveButton, { passive: true });
         yesBtn.addEventListener("click", () => {
-            result.textContent = "Cool, call me when you're done!";
-
-            // Adjust color if button is large and likely overlapping text
-            if (yesScale > 1.8) {
-                result.style.color = "white";
-                result.style.textShadow = "0 2px 4px rgba(0,0,0,0.5)";
-                result.style.position = "relative";
-                result.style.zIndex = "20";
-            } else {
-                result.style.color = ""; // Reset to default
-                result.style.textShadow = "";
-            }
-
-            result.classList.add('visible');
-
-            const subject = encodeURIComponent("Beer Time! 🍻");
-            const body = encodeURIComponent(`Hey! I'm in for a beer. Let's go! \n\n- ${friendName}`);
-
-            // Open mailto link
-            // setTimeout(() => {
-            //     window.location.href = `mailto:${myEmail}?subject=${subject}&body=${body}`;
-            // }, 800);
+            $("join-name").value = params.get("name") && params.get("name") !== "Buddy" ? params.get("name") : "";
+            show("screen-join");
         });
 
+        // ── JOIN ──
+        $("join-go").addEventListener("click", async () => {
+            const name = $("join-name").value.trim();
+            if (!name) return setStatus("join-status", "What's your name?", "err");
+            $("join-go").disabled = true;
+            setStatus("join-status", "Getting your location…");
+            try {
+                const loc = await getLocation();
+                setStatus("join-status", "Joining…");
+                const id = await store.join(planId, { name, lat: loc.lat, lng: loc.lng, bike: $("join-bike").checked });
+                const currentPlan = new URLSearchParams(location.search).get("plan"); // link mode rewrites it
+                localStorage.setItem(myKey(currentPlan), id);
+                startPlan(currentPlan);
+            } catch (e) { setStatus("join-status", e.message, "err"); $("join-go").disabled = false; }
+        });
 
+        // ── PLAN ──
+        let map, layer, pollTimer, lastSig = "";
+        const hasMap = () => typeof window.L !== "undefined";
+        function ensureMap() {
+            if (map) return;
+            if (!hasMap()) { $("map").classList.add("hidden"); layer = { clearLayers() {} }; return; }
+            map = L.map("map", { zoomControl: true, attributionControl: true });
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+            layer = L.layerGroup().addTo(map);
+        }
+        const pin = (emoji) => L.divIcon({ className: "", html: `<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))">${emoji}</div>`, iconSize: [24, 24], iconAnchor: [12, 22] });
+        const fmt = (m) => Math.round(m) + " min";
+        const modeIcon = { bike: "🚲", metro: "🚇", walk: "🚶" };
+        const gmaps = (p, bar, mode) => `https://www.google.com/maps/dir/?api=1&origin=${p.lat},${p.lng}&destination=${bar.lat},${bar.lng}&travelmode=${mode === "metro" ? "transit" : mode === "bike" ? "bicycling" : "walking"}`;
+
+        async function startPlan(id) {
+            show("screen-plan");
+            ensureMap();
+            const link = inviteURL(id, "");
+            $("plan-copy").onclick = () => copyText(link, $("plan-copy"));
+            $("plan-refresh").onclick = () => refreshPlan(id, true);
+            store.hostName(id).then(h => { if (h) $("plan-title").textContent = `${h}'s beer plan 🍻`; });
+            await refreshPlan(id, true);
+            if (hasSupabase) {
+                clearInterval(pollTimer);
+                pollTimer = setInterval(() => refreshPlan(id, false), 5000);
+                try { // realtime, if enabled on the table
+                    sb.channel("plan-" + id).on("postgres_changes", { event: "INSERT", schema: "public", table: "participants", filter: `plan_id=eq.${id}` }, () => refreshPlan(id, false)).subscribe();
+                } catch { }
+            }
+        }
+
+        async function refreshPlan(id, force) {
+            let people;
+            try { people = await store.list(id); }
+            catch (e) { return setStatus("plan-status", "Couldn't load the plan: " + e.message, "err"); }
+
+            const sig = people.map(p => p.id).join("|");
+            if (!force && sig === lastSig) return;
+            lastSig = sig;
+
+            $("people").innerHTML = people.map(p => `<span class="pill">${p.bike ? "🚲" : "🚇"} ${esc(p.name)}</span>`).join("")
+                + (people.length < 2 ? `<span class="pill waiting">waiting for someone to say yes…</span>` : "");
+            $("plan-sub").textContent = people.length < 2
+                ? "Share the invite link — suggestions appear as soon as two people are in."
+                : `${people.length} people in. Bars ranked so nobody travels much longer than anyone else.`;
+
+            layer.clearLayers();
+            if (hasMap()) people.forEach(p => L.marker([p.lat, p.lng], { icon: pin("📍") }).bindPopup(esc(p.name)).addTo(layer));
+            if (hasMap() && people.length) map.fitBounds(L.latLngBounds(people.map(p => [p.lat, p.lng])).pad(0.4), { maxZoom: 15 });
+
+            if (people.length < 2) { $("bars").innerHTML = ""; setStatus("plan-status", ""); return; }
+
+            setStatus("plan-status", "Looking for bars…");
+            $("plan-status").innerHTML = '<span class="spinner"></span>Looking for bars and metro stations…';
+            try {
+                const center = { lat: people.reduce((a, p) => a + p.lat, 0) / people.length, lng: people.reduce((a, p) => a + p.lng, 0) / people.length };
+                const spread = Math.max(...people.map(p => haversine(center, p)));
+                const barRadius = Math.min(4000, Math.max(700, spread * 0.7 + 400));
+                const stationRadius = Math.min(20000, spread + 2000);
+                const { bars, stations } = await fetchOSM(center, barRadius, stationRadius);
+                if (!bars.length) { $("bars").innerHTML = ""; return setStatus("plan-status", "No bars found in between on OpenStreetMap. Try again later or widen the search.", "err"); }
+
+                let ranked = rankBars(people, bars, stations).slice(0, 6);
+                ranked = await refineWithORS(ranked, people);
+                ranked = ranked.slice(0, 5);
+
+                if (hasMap()) {
+                stations.forEach(s => L.circleMarker([s.lat, s.lng], { radius: 3, color: "#3498db", fillOpacity: .9 }).bindTooltip(esc(s.name)).addTo(layer));
+                ranked.forEach((r, i) => L.marker([r.bar.lat, r.bar.lng], { icon: pin(i === 0 ? "🍺" : "🍻") }).bindPopup(`<b>${esc(r.bar.name)}</b>`).addTo(layer));
+                map.fitBounds(L.latLngBounds([...people.map(p => [p.lat, p.lng]), ...ranked.map(r => [r.bar.lat, r.bar.lng])]).pad(0.2));
+                }
+
+                $("bars").innerHTML = ranked.map((r, i) => `
+                    <div class="bar ${i === 0 ? "top" : ""}">
+                        <span class="rank">${i === 0 ? "⭐ Fairest" : "#" + (i + 1)}</span>
+                        <h3>${esc(r.bar.name)}</h3>
+                        <div class="meta">${esc(r.bar.kind)}${r.bar.tags["addr:street"] ? " · " + esc((r.bar.tags["addr:housenumber"] || "") + " " + r.bar.tags["addr:street"]).trim() : ""}
+                            · longest trip ≈ ${fmt(r.worst)}
+                            · <a href="https://www.openstreetmap.org/?mlat=${r.bar.lat}&mlon=${r.bar.lng}#map=18/${r.bar.lat}/${r.bar.lng}" target="_blank" rel="noopener">map</a></div>
+                        <div class="legs">${r.legs.map(l => `
+                            <div class="leg">
+                                <span class="who">${esc(l.person.name)}</span>
+                                <span class="modes">
+                                    <b>${modeIcon[l.t.bestMode]} ${fmt(l.t.best)}</b>${l.t.metro && l.t.bestMode === "metro" ? ` <small>(${esc(l.t.metro.from)} → ${esc(l.t.metro.to)})</small>` : ""}
+                                    ${l.t.bike != null && l.t.bestMode !== "bike" ? ` · 🚲 ${fmt(l.t.bike)}` : ""}
+                                    ${l.t.metro && l.t.bestMode !== "metro" ? ` · 🚇 ${fmt(l.t.metro.min)}` : ""}
+                                    ${l.t.bestMode !== "walk" ? ` · 🚶 ${fmt(l.t.walk)}` : ""}
+                                </span>
+                                <a href="${gmaps(l.person, r.bar, l.t.bestMode)}" target="_blank" rel="noopener">Route ↗</a>
+                            </div>`).join("")}
+                        </div>
+                    </div>`).join("");
+                setStatus("plan-status", `${bars.length} bars · ${stations.length} stations considered`, "ok");
+            } catch (e) {
+                setStatus("plan-status", "Couldn't compute suggestions: " + e.message, "err");
+            }
+        }
+
+        // ═══════════════════════ ROUTER ═══════════════════════
+        (async function boot() {
+            if (!planId) return show("screen-home");
+            if (joinedId || params.get("view")) return startPlan(planId);
+            // Invite screen
+            const friend = params.get("name") || "there";
+            const host = await store.hostName(planId).catch(() => null);
+            $("question").innerHTML = `Hey ${esc(friend)}, ${host ? esc(host) + " wants to know: " : ""}want to grab a beer? <span class="emoji">🍺</span>`;
+            show("screen-invite");
+        })();
     </script>
 </body>
 
