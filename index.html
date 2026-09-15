@@ -249,7 +249,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="config.js?v=4"></script>
+    <script src="config.js?v=5"></script>
     <script>
         // ═══════════════════════ SETUP ═══════════════════════
         const CFG = Object.assign({
@@ -397,47 +397,77 @@
         }
 
         // ═══════════════════════ OPENSTREETMAP (bars + metro stations) ═══════════════════════
-        const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+        const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
         let osmCache = null; // { key, bars, stations }
+        const OSM_TIMEOUT_MS = 50000;
 
-        async function fetchOSM(center, barRadius, stationRadius) {
-            const key = `${center.lat.toFixed(3)},${center.lng.toFixed(3)},${Math.round(barRadius)},${Math.round(stationRadius)}`;
-            if (osmCache && osmCache.key === key) return osmCache;
-            const q = `[out:json][timeout:25];
+        function overpassQuery(center, barRadius, stationRadius) {
+            const c = `${center.lat.toFixed(5)},${center.lng.toFixed(5)}`;
+            return `[out:json][timeout:40];
 (
-  nwr["amenity"~"^(bar|pub|biergarten)$"](around:${Math.round(barRadius)},${center.lat},${center.lng});
-  node["station"="subway"](around:${Math.round(stationRadius)},${center.lat},${center.lng});
-  node["railway"="station"]["subway"="yes"](around:${Math.round(stationRadius)},${center.lat},${center.lng});
-  node["station"="light_rail"](around:${Math.round(stationRadius)},${center.lat},${center.lng});
+  nwr["amenity"~"^(bar|pub|biergarten)$"]["name"](around:${Math.round(barRadius)},${c});
+  node["station"="subway"](around:${Math.round(stationRadius)},${c});
+  node["railway"="station"]["subway"="yes"](around:${Math.round(stationRadius)},${c});
+  node["station"="light_rail"](around:${Math.round(stationRadius)},${c});
 );
 out center tags;`;
+        }
+
+        function parseOverpass(json) {
+            const bars = [], stations = [], seenSt = new Set();
+            for (const el of json.elements || []) {
+                const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
+                if (lat == null) continue;
+                const t = el.tags || {};
+                if (/^(bar|pub|biergarten)$/.test(t.amenity || "")) {
+                    if (!t.name) continue;
+                    bars.push({ id: el.type + el.id, name: t.name, kind: t.amenity, lat, lng, tags: t });
+                } else {
+                    const nm = t.name || "Station";
+                    const k = nm + Math.round(lat * 500) + Math.round(lng * 500); // dedupe entrances/platforms
+                    if (seenSt.has(k)) continue; seenSt.add(k);
+                    stations.push({ name: nm, lat, lng });
+                }
+            }
+            return { bars, stations };
+        }
+
+        // Ask every mirror at once; first good answer wins.
+        async function overpassFetch(q) {
+            const ctl = new AbortController();
+            const tm = setTimeout(() => ctl.abort(), OSM_TIMEOUT_MS);
+            const one = async (url) => {
+                const r = await fetch(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" }, signal: ctl.signal });
+                if (!r.ok) throw new Error(url + " → " + r.status);
+                const j = await r.json();
+                if (!Array.isArray(j.elements)) throw new Error("bad response");
+                return j;
+            };
+            try { return await Promise.any(OVERPASS.map(one)); }
+            catch (e) { throw new Error(ctl.signal.aborted ? "OpenStreetMap servers are slow right now" : "OpenStreetMap servers are busy"); }
+            finally { clearTimeout(tm); ctl.abort(); }
+        }
+
+        async function fetchOSM(center, barRadius, stationRadius) {
+            const key = `osm:${center.lat.toFixed(3)},${center.lng.toFixed(3)},${Math.round(barRadius / 100)},${Math.round(stationRadius / 500)}`;
+            if (osmCache && osmCache.key === key) return osmCache;
+            try { // cached on this phone for an hour → instant retries and re-opens
+                const c = JSON.parse(localStorage.getItem(key) || "null");
+                if (c && Date.now() - c.at < 3600e3) return (osmCache = { key, bars: c.bars, stations: c.stations });
+            } catch { }
+            // Try the full area, then progressively smaller ones if the servers struggle.
+            const attempts = [[barRadius, stationRadius], [Math.max(600, barRadius * 0.6), Math.min(stationRadius, 6000)], [Math.max(500, barRadius * 0.4), 3000]];
             let lastErr;
-            for (const url of OVERPASS) {
+            for (const [br, sr] of attempts) {
                 try {
-                    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 30000);
-                    const r = await fetch(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" }, signal: ctl.signal }).finally(() => clearTimeout(tm));
-                    if (!r.ok) throw new Error("Overpass " + r.status);
-                    const json = await r.json();
-                    const bars = [], stations = [], seenSt = new Set();
-                    for (const el of json.elements) {
-                        const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
-                        if (lat == null) continue;
-                        const t = el.tags || {};
-                        if (/^(bar|pub|biergarten)$/.test(t.amenity || "")) {
-                            if (!t.name) continue;
-                            bars.push({ id: el.type + el.id, name: t.name, kind: t.amenity, lat, lng, tags: t });
-                        } else {
-                            const nm = t.name || "Station";
-                            const k = nm + Math.round(lat * 500) + Math.round(lng * 500); // dedupe entrances/platforms
-                            if (seenSt.has(k)) continue; seenSt.add(k);
-                            stations.push({ name: nm, lat, lng });
-                        }
-                    }
+                    const json = await overpassFetch(overpassQuery(center, br, sr));
+                    const { bars, stations } = parseOverpass(json);
                     osmCache = { key, bars, stations };
+                    try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), bars, stations })); } catch { }
                     return osmCache;
                 } catch (e) { lastErr = e; }
             }
-            throw lastErr || new Error("Could not reach OpenStreetMap.");
+            throw new Error((lastErr ? lastErr.message : "Could not reach OpenStreetMap") + " — tap ↻ Refresh in a moment.");
         }
 
         // ═══════════════════════ TRAVEL MODEL ═══════════════════════
