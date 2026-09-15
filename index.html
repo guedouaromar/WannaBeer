@@ -154,6 +154,33 @@
         details.import { margin-top: 18px; text-align: left; font-size: 13px; color: var(--muted); }
         details.import summary { cursor: pointer; font-weight: 600; }
         details.import p { margin: 8px 0; }
+        .authbar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin: -24px -8px 12px; min-height: 22px; }
+        .authbar a { color: var(--primary-dark); font-weight: 600; cursor: pointer; text-decoration: none; }
+        .signin { border: 2px dashed #eef1f4; border-radius: 16px; padding: 16px; margin-top: 22px; text-align: left; }
+        .signin h4 { margin: 0 0 6px; font-size: 14px; }
+        .signin p { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+        .btn.google { background: #fff; color: #333; border: 2px solid #e1e5ea; display: inline-flex; align-items: center; gap: 8px; }
+        .btn.google:hover { background: #f6f7f9; }
+        .or { font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+        .section { text-align: left; margin: 18px 0; }
+        .section > label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; border: 2px solid #e1e5ea; border-radius: 999px; padding: 6px 8px 6px 12px; font-size: 14px; font-weight: 600; cursor: pointer; user-select: none; background: #fff; transition: all .15s; }
+        .chip:hover { border-color: #ffd9a8; }
+        .chip.sel { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .chip small { font-weight: 400; opacity: .75; }
+        .chip .fav { font-size: 15px; padding: 0 4px; border-radius: 50%; opacity: .55; }
+        .chip .fav.on { opacity: 1; }
+        .chip.sel .fav { color: #fff; }
+        .chip.suggest { border-style: dashed; background: #fbfcfd; }
+        .chip.suggest .add { font-size: 12px; color: var(--primary-dark); }
+        .authbar input { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid #e1e5ea; border-radius: 8px; width: 140px; }
+        .chip.pending { border-style: dashed; cursor: default; color: var(--muted); font-weight: 500; }
+        .invite-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border: 2px solid var(--primary); background: #fffaf3; border-radius: 14px; padding: 12px 14px; margin: 8px 0; text-align: left; }
+        .invite-card b { font-size: 15px; }
+        .invite-card small { color: var(--muted); display: block; font-size: 12px; margin-top: 2px; }
+        .inline-inputs { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 8px; }
+        @media (max-width: 520px) { .inline-inputs { grid-template-columns: 1fr; } }
         .rank { float: right; font-size: 12px; font-weight: 700; color: var(--primary-dark); background: #ffe8c7; padding: 3px 8px; border-radius: 8px; }
 
         .link-box {
@@ -169,14 +196,32 @@
 <body>
     <!-- ───────────── HOME: create an invite ───────────── -->
     <div class="card" id="screen-home">
+        <div class="authbar" id="authbar"></div>
         <h1>Wanna beer? <span class="emoji">🍺</span></h1>
         <p class="sub">Invite people, everyone shares where they are, and we find a bar that's fair for all — by bike or metro.</p>
+
+        <div id="inbox" class="section hidden">
+            <label>🍺 Invites for you</label>
+            <div id="inbox-list"></div>
+        </div>
+
+        <div id="friends-box" class="section hidden">
+            <label>Ask friends <small style="font-weight:400">(tap to select · ★ to pin as favourite)</small></label>
+            <div class="chips" id="friend-chips"><span class="chip pending">No friends yet — add one below, or they'll appear after your first beer together.</span></div>
+            <div class="inline-inputs">
+                <input type="text" id="add-email" placeholder="friend@email.com" inputmode="email" autocapitalize="off" />
+                <input type="text" id="add-name" placeholder="Their name" maxlength="40" />
+                <button class="btn small ghost" id="add-friend">+ Add</button>
+            </div>
+            <div class="status" id="friends-status"></div>
+        </div>
+
         <div class="field">
             <label>Your name</label>
             <input type="text" id="host-name" placeholder="Omar" maxlength="40" />
         </div>
-        <div class="field">
-            <label>Who are you asking? (optional, personalises the invite)</label>
+        <div class="field" id="friend-name-field">
+            <label>Who are you asking? (optional, personalises the link)</label>
             <input type="text" id="friend-name" placeholder="Karim" maxlength="40" />
         </div>
         <div class="field check">
@@ -194,6 +239,15 @@
                 <button class="btn small" id="open-plan">Open the plan →</button>
             </div>
         </div>
+        <div class="signin hidden" id="signin-box">
+            <h4>Sign in to invite friends directly</h4>
+            <p>No more copying links: pick friends from your list, they get the invite in the app and by email. Your favourite bars follow you too.</p>
+            <button class="btn google" id="signin-google"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.5 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.5 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.1 6.9-10.2 6.9-17.7z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.7-6c-2.1 1.4-4.8 2.3-7.8 2.3-6.3 0-11.6-4-13.5-9.7l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg> Sign in with Google</button>
+            <div class="or">or get a login link by email</div>
+            <div class="row"><input type="text" id="signin-email" placeholder="you@email.com" inputmode="email" autocapitalize="off" style="flex:1;min-width:180px" /><button class="btn small ghost" id="signin-send">Send link</button></div>
+            <div class="status" id="signin-status"></div>
+        </div>
+
         <details class="import">
             <summary>⭐ Import my Google Maps saved places (optional)</summary>
             <p>Google Takeout → select only <b>Maps (your places)</b> → export. Upload the <b>Saved Places.json</b> file (or a list's .csv). Places that match a bar on the map get suggested first for you.</p>
@@ -249,7 +303,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="config.js?v=5"></script>
+    <script src="config.js?v=7"></script>
     <script>
         // ═══════════════════════ SETUP ═══════════════════════
         const CFG = Object.assign({
@@ -288,6 +342,12 @@
                 return d;
             } catch { return crypto.randomUUID(); }
         })();
+        // Signed-in user (Supabase Auth). When present, favourites/participants use the account id
+        // instead of the device id, so they follow the person across phones.
+        let currentUser = null, profile = null;
+        const oid = () => currentUser ? currentUser.id : deviceId;
+        const myEmail = () => (currentUser && currentUser.email || "").toLowerCase();
+
         const localFavs = {
             get() { try { return JSON.parse(localStorage.getItem("wannabeer:favs") || "[]"); } catch { return []; } },
             set(v) { try { localStorage.setItem("wannabeer:favs", JSON.stringify(v)); } catch { } },
@@ -296,7 +356,7 @@
         const store = {
             // ---- favourites ----
             async favsFor(ownerIds) {
-                const mine = localFavs.get().map(f => ({ ...f, owner_id: deviceId }));
+                const mine = localFavs.get().map(f => ({ ...f, owner_id: oid() }));
                 if (!hasSupabase) return mine;
                 const ids = [...new Set(ownerIds.filter(Boolean))];
                 if (!ids.length) return mine;
@@ -305,7 +365,7 @@
                 return data;
             },
             async addFav(f) {
-                const row = { owner_id: deviceId, owner_name: f.owner_name, bar_key: f.bar_key, name: f.name, lat: f.lat, lng: f.lng, source: f.source || "app" };
+                const row = { owner_id: oid(), owner_name: f.owner_name, bar_key: f.bar_key, name: f.name, lat: f.lat, lng: f.lng, source: f.source || "app" };
                 if (hasSupabase) {
                     const { error } = await sb.from("favourites").upsert(row, { onConflict: "owner_id,bar_key", ignoreDuplicates: true });
                     if (error) throw error;
@@ -316,25 +376,99 @@
             async addFavs(rows) { // bulk (import)
                 if (hasSupabase) {
                     for (let i = 0; i < rows.length; i += 200) {
-                        const { error } = await sb.from("favourites").upsert(rows.slice(i, i + 200).map(f => ({ ...f, owner_id: deviceId })), { onConflict: "owner_id,bar_key", ignoreDuplicates: true });
+                        const { error } = await sb.from("favourites").upsert(rows.slice(i, i + 200).map(f => ({ ...f, owner_id: oid() })), { onConflict: "owner_id,bar_key", ignoreDuplicates: true });
                         if (error) throw error;
                     }
                 } else {
                     const v = localFavs.get(); const keys = new Set(v.map(x => x.bar_key));
-                    rows.forEach(f => { if (!keys.has(f.bar_key)) v.push({ ...f, owner_id: deviceId }); }); localFavs.set(v);
+                    rows.forEach(f => { if (!keys.has(f.bar_key)) v.push({ ...f, owner_id: oid() }); }); localFavs.set(v);
                 }
             },
             async removeFav(bar_key) {
                 if (hasSupabase) {
-                    const { error } = await sb.from("favourites").delete().eq("owner_id", deviceId).eq("bar_key", bar_key);
+                    const { error } = await sb.from("favourites").delete().eq("owner_id", oid()).eq("bar_key", bar_key);
                     if (error) throw error;
                 } else localFavs.set(localFavs.get().filter(x => x.bar_key !== bar_key));
+            },
+
+            // ---- accounts ----
+            async myFriends() {
+                const { data, error } = await sb.from("friends").select("*").eq("user_id", currentUser.id)
+                    .order("favourite", { ascending: false }).order("last_beer_at", { ascending: false, nullsFirst: false }).order("friend_name");
+                if (error) throw error; return data;
+            },
+            async addFriend(email, name) {
+                const row = { user_id: currentUser.id, friend_email: email.toLowerCase(), friend_name: name || email.split("@")[0] };
+                const { error } = await sb.from("friends").upsert(row, { onConflict: "user_id,friend_email" });
+                if (error) throw error;
+            },
+            async saveName(name) {
+                const { error } = await sb.from("profiles").upsert({ id: currentUser.id, email: currentUser.email, display_name: name }, { onConflict: "id" });
+                if (error) throw error;
+                profile = { ...(profile || {}), display_name: name };
+            },
+            // People who invited me, or had a beer with me, that aren't in my list yet
+            async suggestedFriends(existing) {
+                const have = new Set(existing.map(f => f.friend_email.toLowerCase()));
+                const ids = new Set();
+                const { data: inv } = await sb.from("invites").select("from_user_id").neq("from_user_id", currentUser.id).limit(50);
+                (inv || []).forEach(i => ids.add(i.from_user_id));
+                const { data: mine } = await sb.from("participants").select("plan_id").eq("user_id", currentUser.id).limit(30);
+                if (mine && mine.length) {
+                    const { data: others } = await sb.from("participants").select("user_id").in("plan_id", mine.map(m => m.plan_id)).neq("user_id", currentUser.id).limit(200);
+                    (others || []).forEach(o => o.user_id && ids.add(o.user_id));
+                }
+                if (!ids.size) return [];
+                const profs = await this.profilesFor([...ids]);
+                return profs.filter(p => p.email && !have.has(p.email.toLowerCase()));
+            },
+            async setFavFriend(id, on) { const { error } = await sb.from("friends").update({ favourite: on }).eq("id", id); if (error) throw error; },
+            async myInvites() {
+                const { data, error } = await sb.from("invites").select("id,plan_id,from_name,created_at,status")
+                    .eq("status", "pending").neq("from_user_id", currentUser.id).order("created_at", { ascending: false }).limit(10);
+                if (error) throw error; return data;
+            },
+            async answerInvite(id, status) { const { error } = await sb.from("invites").update({ status }).eq("id", id); if (error) throw error; },
+            async planInvites(planId) {
+                const { data } = await sb.from("invites").select("id,to_email,to_name,status").eq("plan_id", planId);
+                return data || [];
+            },
+            // Create the invite row and email a login link that lands on the plan.
+            async sendInvite(planId, fromName, friend) {
+                const { data: inv, error } = await sb.from("invites")
+                    .insert({ plan_id: planId, from_user_id: currentUser.id, from_name: fromName, to_email: friend.friend_email, to_name: friend.friend_name, status: "pending" }).select().single();
+                if (error) throw error;
+                const url = inviteURL(planId, friend.friend_name) + "&inv=" + inv.id;
+                const { error: mailErr } = await sb.auth.signInWithOtp({ email: friend.friend_email, options: { emailRedirectTo: url, shouldCreateUser: true } });
+                return { inv, mailed: !mailErr, mailErr };
+            },
+            async profilesFor(ids) {
+                if (!ids.length) return [];
+                const { data } = await sb.from("profiles").select("id,email,display_name").in("id", ids);
+                return data || [];
+            },
+            // After a beer together: remember the other signed-in participants as friends (once per plan).
+            async creditFriends(planId, people) {
+                if (!currentUser) return;
+                const flag = "wannabeer:credited:" + planId;
+                try { if (localStorage.getItem(flag)) return; } catch { }
+                const others = people.filter(p => p.user_id && p.user_id !== currentUser.id);
+                if (!others.length) return;
+                const profs = await this.profilesFor(others.map(p => p.user_id));
+                const existing = await this.myFriends();
+                for (const p of others) {
+                    const pr = profs.find(x => x.id === p.user_id); if (!pr) continue;
+                    const ex = existing.find(f => f.friend_email.toLowerCase() === pr.email.toLowerCase());
+                    await sb.from("friends").upsert({ user_id: currentUser.id, friend_email: pr.email.toLowerCase(), friend_name: p.name || pr.display_name,
+                        friend_user_id: p.user_id, beers: ((ex && ex.beers) || 0) + 1, last_beer_at: new Date().toISOString(), favourite: ex ? ex.favourite : false }, { onConflict: "user_id,friend_email" });
+                }
+                try { localStorage.setItem(flag, "1"); } catch { }
             },
 
             // returns plan id (Supabase) or encoded payload (link mode)
             async createPlan(host) {
                 if (hasSupabase) {
-                    const { data: plan, error } = await sb.from("plans").insert({ host_name: host.name }).select().single();
+                    const { data: plan, error } = await sb.from("plans").insert({ host_name: host.name, host_user_id: currentUser ? currentUser.id : null }).select().single();
                     if (error) throw error;
                     await this.join(plan.id, host);
                     return plan.id;
@@ -344,13 +478,13 @@
             async join(planId, p) {
                 if (useDb(planId)) {
                     const { data, error } = await sb.from("participants")
-                        .insert({ plan_id: planId, name: p.name, lat: p.lat, lng: p.lng, bike: p.bike, device_id: deviceId }).select().single();
+                        .insert({ plan_id: planId, name: p.name, lat: p.lat, lng: p.lng, bike: p.bike, device_id: oid(), user_id: currentUser ? currentUser.id : null }).select().single();
                     if (error) throw error;
                     return data.id;
                 }
                 // link mode: append to in-memory list and rewrite URL so it can be re-shared
                 const s = b64d(planId) || { h: [] };
-                p.id = "local-" + Date.now(); p.device_id = deviceId;
+                p.id = "local-" + Date.now(); p.device_id = oid();
                 s.h.push(p);
                 const url = new URL(location.href);
                 url.searchParams.set("plan", b64e(s));
@@ -360,7 +494,7 @@
             async list(planId) {
                 if (useDb(planId)) {
                     const { data, error } = await sb.from("participants")
-                        .select("id,name,lat,lng,bike,device_id,created_at").eq("plan_id", planId).order("created_at");
+                        .select("id,name,lat,lng,bike,device_id,user_id,created_at").eq("plan_id", planId).order("created_at");
                     if (error) throw error;
                     return data;
                 }
@@ -583,6 +717,118 @@ out center tags;`;
             ? "Group mode: everyone who says yes appears live."
             : "Link-only mode (no server configured): works 1-on-1 — the friend's phone computes the meeting point. Add Supabase keys in config.js for groups.";
 
+        // ── AUTH ──
+        async function initAuth() {
+            if (!hasSupabase) return;
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                currentUser = session ? session.user : null;
+                await loadProfile();
+                sb.auth.onAuthStateChange((_ev, s) => {
+                    const u = s ? s.user : null;
+                    if ((u && u.id) !== (currentUser && currentUser.id)) { currentUser = u; loadProfile().then(() => { if (!planId) renderHome(); }); }
+                });
+            } catch (e) { console.warn("auth:", e.message); }
+        }
+        async function loadProfile() {
+            profile = null;
+            if (!currentUser) return;
+            const { data } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
+            profile = data || { display_name: (currentUser.user_metadata && (currentUser.user_metadata.full_name || currentUser.user_metadata.name)) || currentUser.email.split("@")[0] };
+            if (!$("host-name").value) $("host-name").value = profile.display_name || "";
+        }
+        const cleanURL = () => location.href.split("#")[0];
+        $("signin-google").onclick = () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: cleanURL() } });
+        $("signin-send").onclick = async () => {
+            const email = $("signin-email").value.trim().toLowerCase();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setStatus("signin-status", "That doesn't look like an email.", "err");
+            $("signin-send").disabled = true;
+            const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: cleanURL(), shouldCreateUser: true } });
+            setStatus("signin-status", error ? error.message : "Check your inbox — tap the link to sign in.", error ? "err" : "ok");
+            $("signin-send").disabled = false;
+        };
+
+        // ── HOME (signed-in extras) ──
+        const selectedFriends = new Map(); // id -> friend row
+        async function renderHome() {
+            const ab = $("authbar");
+            if (!hasSupabase) { ab.innerHTML = ""; return; }
+            if (!currentUser) {
+                ab.innerHTML = "";
+                $("signin-box").classList.remove("hidden"); $("friends-box").classList.add("hidden"); $("inbox").classList.add("hidden"); $("friend-name-field").classList.remove("hidden");
+                return;
+            }
+            const nm = (profile && profile.display_name) || currentUser.email;
+            ab.innerHTML = `<span id="me-name">Hi ${esc(nm)}</span> <a id="edit-name" title="Change my name">✎</a> · <a id="signout">Sign out</a>`;
+            $("signout").onclick = async () => { await sb.auth.signOut(); selectedFriends.clear(); location.reload(); };
+            $("edit-name").onclick = () => {
+                ab.innerHTML = `<input id="name-input" maxlength="40" value="${esc(nm)}" /> <a id="name-save">Save</a> · <a id="name-cancel">Cancel</a>`;
+                $("name-input").focus();
+                $("name-cancel").onclick = renderHome;
+                $("name-save").onclick = async () => {
+                    const v = $("name-input").value.trim(); if (!v) return;
+                    try { await store.saveName(v); $("host-name").value = v; renderHome(); }
+                    catch (e) { ab.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span> · <a id="name-cancel">Back</a>`; $("name-cancel").onclick = renderHome; }
+                };
+                $("name-input").onkeydown = (ev) => { if (ev.key === "Enter") $("name-save").click(); };
+            };
+            $("signin-box").classList.add("hidden"); $("friends-box").classList.remove("hidden");
+            loadInbox(); loadFriends();
+        }
+        const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; };
+        async function loadInbox() {
+            try {
+                const inv = await store.myInvites();
+                $("inbox").classList.toggle("hidden", !inv.length);
+                $("inbox-list").innerHTML = inv.map(i => `
+                    <div class="invite-card" data-id="${i.id}">
+                        <div><b>${esc(i.from_name)} wants a beer 🍺</b><small>${ago(i.created_at)}</small></div>
+                        <div class="row">
+                            <button class="btn small ghost" data-act="no">Not today</button>
+                            <button class="btn small" data-act="open">See where →</button>
+                        </div>
+                    </div>`).join("");
+                $("inbox-list").querySelectorAll("button").forEach(b => b.onclick = async () => {
+                    const card = b.closest(".invite-card"), id = card.dataset.id, i = inv.find(x => x.id === id);
+                    if (b.dataset.act === "no") { await store.answerInvite(id, "no"); card.remove(); if (!$("inbox-list").children.length) $("inbox").classList.add("hidden"); return; }
+                    const u = new URL(cleanURL().split("?")[0]); u.searchParams.set("plan", i.plan_id); u.searchParams.set("inv", id); location.href = u.toString();
+                });
+            } catch (e) { console.warn("inbox:", e.message); }
+        }
+        async function loadFriends() {
+            try {
+                const friends = await store.myFriends();
+                const box = $("friend-chips");
+                const sugg = await store.suggestedFriends(friends).catch(() => []);
+                if (!friends.length && !sugg.length) { box.innerHTML = `<span class="chip pending">No friends yet — add one below, or they'll appear after your first beer together.</span>`; return; }
+                box.innerHTML = sugg.map(p => `<span class="chip suggest" data-sugg="${esc(p.email)}" data-name="${esc(p.display_name || "")}" title="Suggested: you've had a beer or an invite together">${esc(p.display_name || p.email)} <span class="add">+ add</span></span>`).join("") + friends.map(f => `
+                    <span class="chip ${selectedFriends.has(f.id) ? "sel" : ""}" data-id="${f.id}" title="${esc(f.friend_email)}">
+                        ${esc(f.friend_name || f.friend_email)}${f.beers ? ` <small>· ${f.beers} 🍺</small>` : ""}
+                        <span class="fav ${f.favourite ? "on" : ""}" title="Favourite">${f.favourite ? "★" : "☆"}</span>
+                    </span>`).join("");
+                box.querySelectorAll(".chip.suggest").forEach(ch => ch.onclick = async () => {
+                    try { await store.addFriend(ch.dataset.sugg, ch.dataset.name); loadFriends(); } catch (e) { setStatus("friends-status", e.message, "err"); }
+                });
+                box.querySelectorAll(".chip[data-id]").forEach(ch => {
+                    const f = friends.find(x => x.id === ch.dataset.id);
+                    ch.onclick = (ev) => {
+                        if (ev.target.classList.contains("fav")) { store.setFavFriend(f.id, !f.favourite).then(loadFriends); return; }
+                        if (selectedFriends.has(f.id)) selectedFriends.delete(f.id); else selectedFriends.set(f.id, f);
+                        ch.classList.toggle("sel", selectedFriends.has(f.id));
+                        $("friend-name-field").classList.toggle("hidden", selectedFriends.size > 0);
+                        $("host-create").textContent = selectedFriends.size ? `📍 Use my location & invite ${selectedFriends.size} friend${selectedFriends.size > 1 ? "s" : ""}` : "📍 Use my location & create invite";
+                    };
+                });
+            } catch (e) { setStatus("friends-status", "Couldn't load friends: " + e.message + (/friends/.test(e.message) ? " — run supabase/003_accounts.sql" : ""), "err"); }
+        }
+        $("add-friend").onclick = async () => {
+            const email = $("add-email").value.trim().toLowerCase(), name = $("add-name").value.trim();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setStatus("friends-status", "Enter a valid email.", "err");
+            if (email === myEmail()) return setStatus("friends-status", "That's you 🙂", "err");
+            try { await store.addFriend(email, name); $("add-email").value = ""; $("add-name").value = ""; setStatus("friends-status", `${name || email} added.`, "ok"); loadFriends(); }
+            catch (e) { setStatus("friends-status", e.message, "err"); }
+        };
+
         // ── HOME ──
         $("host-create").addEventListener("click", async () => {
             const name = $("host-name").value.trim();
@@ -591,13 +837,25 @@ out center tags;`;
             setStatus("host-status", "Getting your location…");
             try {
                 const loc = await getLocation();
+                if (currentUser && hasSupabase && profile && name !== profile.display_name) store.saveName(name).catch(() => { });
                 setStatus("host-status", "Creating your invite…");
                 const id = await store.createPlan({ name, lat: loc.lat, lng: loc.lng, bike: $("host-bike").checked });
-                const link = inviteURL(id, $("friend-name").value.trim());
+                const link = inviteURL(id, selectedFriends.size ? "" : $("friend-name").value.trim());
                 localStorage.setItem(myKey(id), "host");
                 $("host-link-text").textContent = link;
                 $("host-link").classList.remove("hidden");
-                setStatus("host-status", "Send this link. When they say yes, the plan updates.", "ok");
+                if (currentUser && selectedFriends.size && useDb(id)) {
+                    setStatus("host-status", "Sending invites…");
+                    const sent = [], failed = [];
+                    for (const f of selectedFriends.values()) {
+                        try { const r = await store.sendInvite(id, name, f); (r.mailed ? sent : failed).push(f.friend_name || f.friend_email); }
+                        catch (e) { failed.push((f.friend_name || f.friend_email) + " (" + e.message + ")"); }
+                    }
+                    setStatus("host-status", (sent.length ? `Invited ${sent.join(", ")} — they'll see it in the app and by email. ` : "")
+                        + (failed.length ? `Couldn't email ${failed.join(", ")}; share the link instead.` : "You can also share the link."), failed.length && !sent.length ? "err" : "ok");
+                } else {
+                    setStatus("host-status", "Send this link. When they say yes, the plan updates.", "ok");
+                }
                 $("copy-link").onclick = () => copyText(link, $("copy-link"));
                 $("share-link").onclick = () => navigator.share ? navigator.share({ title: "Beer?", text: `${name} wants to grab a beer 🍺`, url: link }) : copyText(link, $("share-link"));
                 $("open-plan").onclick = () => { const u = new URL(location.href.split("?")[0]); u.searchParams.set("plan", id); u.searchParams.set("view", "1"); location.href = u.toString(); };
@@ -655,8 +913,16 @@ out center tags;`;
         }
         noBtn.addEventListener("mouseover", moveButton);
         noBtn.addEventListener("touchstart", moveButton, { passive: true });
+        const inviteId = params.get("inv");
         yesBtn.addEventListener("click", () => {
-            $("join-name").value = params.get("name") && params.get("name") !== "Buddy" ? params.get("name") : "";
+            $("join-name").value = (profile && profile.display_name) || (params.get("name") && params.get("name") !== "Buddy" ? params.get("name") : "");
+            if (inviteId && currentUser && hasSupabase) {
+                store.answerInvite(inviteId, "yes").catch(() => { });
+                sb.from("invites").select("from_user_id,from_name").eq("id", inviteId).maybeSingle().then(async ({ data }) => {
+                    if (!data) return; const [p] = await store.profilesFor([data.from_user_id]);
+                    if (p && p.email) sb.from("friends").upsert({ user_id: currentUser.id, friend_email: p.email.toLowerCase(), friend_name: data.from_name || p.display_name, friend_user_id: data.from_user_id }, { onConflict: "user_id,friend_email", ignoreDuplicates: true }).then(() => { });
+                }).catch(() => { });
+            }
             show("screen-join");
         });
 
@@ -717,8 +983,14 @@ out center tags;`;
             if (!force && sig === lastSig) return;
             lastSig = sig;
 
-            $("people").innerHTML = people.map(p => `<span class="pill">${p.bike ? "🚲" : "🚇"} ${esc(p.name)}</span>`).join("")
-                + (people.length < 2 ? `<span class="pill waiting">waiting for someone to say yes…</span>` : "");
+            let invPills = "";
+            if (useDb(id) && currentUser) {
+                const inv = await store.planInvites(id).catch(() => []);
+                invPills = inv.filter(i => i.status !== "yes").map(i => `<span class="pill waiting">${i.status === "no" ? "❌" : "✉️"} ${esc(i.to_name || i.to_email)} ${i.status === "no" ? "can't" : "invited"}</span>`).join("");
+                store.creditFriends(id, people).catch(() => { });
+            }
+            $("people").innerHTML = people.map(p => `<span class="pill">${p.bike ? "🚲" : "🚇"} ${esc(p.name)}</span>`).join("") + invPills
+                + (people.length < 2 && !invPills ? `<span class="pill waiting">waiting for someone to say yes…</span>` : "");
             $("plan-sub").textContent = people.length < 2
                 ? "Share the invite link — suggestions appear as soon as two people are in."
                 : `${people.length} people in. Bars ranked so nobody travels much longer than anyone else.`;
@@ -743,8 +1015,8 @@ out center tags;`;
                 const stations = osm.stations;
                 const favs = await store.favsFor(people.map(p => p.device_id)).catch(e => { console.warn("favourites:", e.message); return []; });
                 const bars = mergeFavourites(osm.bars.map(b => ({ ...b })), favs);
-                const myKeys = new Set(favs.filter(f => f.owner_id === deviceId).map(f => f.bar_key));
-                const me = people.find(p => p.device_id === deviceId);
+                const myKeys = new Set(favs.filter(f => f.owner_id === oid()).map(f => f.bar_key));
+                const me = people.find(p => p.device_id === oid() || (currentUser && p.user_id === currentUser.id));
                 if (!bars.length) { $("bars").innerHTML = ""; return setStatus("plan-status", "No bars found in between on OpenStreetMap. Try again later or widen the search.", "err"); }
 
                 let ranked = promoteFavourites(rankBars(people, bars, stations)).slice(0, 6);
@@ -761,7 +1033,7 @@ out center tags;`;
                     <div class="bar ${i === 0 ? "top" : ""}">
                         <span class="rank">${i === 0 ? (r.bar.favBy.length ? "⭐ Favourite & fair" : "🏆 Fairest") : "#" + (i + 1)}</span>
                         ${me ? `<button class="star ${myKeys.has(r.bar.id) ? "on" : ""}" data-key="${esc(r.bar.id)}" title="${myKeys.has(r.bar.id) ? "Remove from my favourites" : "Add to my favourites"}">${myKeys.has(r.bar.id) ? "★" : "☆"}</button>` : ""}
-                        <h3>${esc(r.bar.name)}${r.bar.favBy.map(f => `<span class="favtag">⭐ ${esc(f.name)}${f.owner_id === deviceId ? " (you)" : ""}</span>`).join("")}</h3>
+                        <h3>${esc(r.bar.name)}${r.bar.favBy.map(f => `<span class="favtag">⭐ ${esc(f.name)}${f.owner_id === oid() ? " (you)" : ""}</span>`).join("")}</h3>
                         <div class="meta">${esc(r.bar.kind)}${r.bar.tags["addr:street"] ? " · " + esc((r.bar.tags["addr:housenumber"] || "") + " " + r.bar.tags["addr:street"]).trim() : ""}
                             · longest trip ≈ ${fmt(r.worst)}
                             · <a href="https://www.openstreetmap.org/?mlat=${r.bar.lat}&mlon=${r.bar.lng}#map=18/${r.bar.lat}/${r.bar.lng}" target="_blank" rel="noopener">map</a></div>
@@ -795,10 +1067,11 @@ out center tags;`;
 
         // ═══════════════════════ ROUTER ═══════════════════════
         (async function boot() {
-            if (!planId) return show("screen-home");
+            await initAuth();
+            if (!planId) { show("screen-home"); return renderHome(); }
             if (joinedId || params.get("view")) return startPlan(planId);
             // Invite screen
-            const friend = params.get("name") || "there";
+            const friend = (profile && profile.display_name) || params.get("name") || "there";
             const host = await store.hostName(planId).catch(() => null);
             $("question").innerHTML = `Hey ${esc(friend)}, ${host ? esc(host) + " wants to know: " : ""}want to grab a beer? <span class="emoji">🍺</span>`;
             show("screen-invite");
