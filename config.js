@@ -19,4 +19,8 @@ window.WANNABEER_CONFIG = {
   METRO_WAIT_MIN: 4,    // platform wait
   METRO_TRANSFER_MIN: 5,// flat penalty when origin and destination stations differ
   MAX_WALK_TO_STATION_M: 1200,
+
+  // Favourites: a participant's starred bar is suggested first when its
+  // longest trip is within this many minutes of the fairest bar.
+  FAV_TOLERANCE_MIN: 10,
 };

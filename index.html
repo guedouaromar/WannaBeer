@@ -148,6 +148,12 @@
         .leg .modes { color: var(--muted); font-size: 13px; }
         .leg .modes b { color: var(--ink); }
         .leg a { color: var(--primary-dark); font-weight: 600; text-decoration: none; font-size: 13px; white-space: nowrap; }
+        .star { float: right; margin-left: 8px; background: none; border: 1px solid #e1e5ea; border-radius: 9px; padding: 4px 9px; font-size: 15px; line-height: 1; color: #b0b7bf; }
+        .star.on { color: #f39c12; border-color: #ffd9a8; background: #fff8ec; }
+        .favtag { display: inline-block; font-size: 11px; font-weight: 700; color: #8a4b08; background: #ffe8c7; padding: 2px 7px; border-radius: 6px; margin-left: 6px; vertical-align: 1px; }
+        details.import { margin-top: 18px; text-align: left; font-size: 13px; color: var(--muted); }
+        details.import summary { cursor: pointer; font-weight: 600; }
+        details.import p { margin: 8px 0; }
         .rank { float: right; font-size: 12px; font-weight: 700; color: var(--primary-dark); background: #ffe8c7; padding: 3px 8px; border-radius: 8px; }
 
         .link-box {
@@ -188,6 +194,12 @@
                 <button class="btn small" id="open-plan">Open the plan →</button>
             </div>
         </div>
+        <details class="import">
+            <summary>⭐ Import my Google Maps saved places (optional)</summary>
+            <p>Google Takeout → select only <b>Maps (your places)</b> → export. Upload the <b>Saved Places.json</b> file (or a list's .csv). Places that match a bar on the map get suggested first for you.</p>
+            <input type="file" id="import-file" accept=".json,.geojson,.csv" />
+            <div class="status" id="import-status"></div>
+        </details>
         <p class="footer-note" id="mode-note"></p>
     </div>
 
@@ -237,7 +249,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="config.js?v=3"></script>
+    <script src="config.js?v=4"></script>
     <script>
         // ═══════════════════════ SETUP ═══════════════════════
         const CFG = Object.assign({
@@ -268,7 +280,57 @@
         const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || "");
         const useDb = (id) => hasSupabase && isUuid(id);
 
+        // Per-browser identity so favourites follow the person without a login
+        const deviceId = (() => {
+            try {
+                let d = localStorage.getItem("wannabeer:device");
+                if (!d) { d = crypto.randomUUID(); localStorage.setItem("wannabeer:device", d); }
+                return d;
+            } catch { return crypto.randomUUID(); }
+        })();
+        const localFavs = {
+            get() { try { return JSON.parse(localStorage.getItem("wannabeer:favs") || "[]"); } catch { return []; } },
+            set(v) { try { localStorage.setItem("wannabeer:favs", JSON.stringify(v)); } catch { } },
+        };
+
         const store = {
+            // ---- favourites ----
+            async favsFor(ownerIds) {
+                const mine = localFavs.get().map(f => ({ ...f, owner_id: deviceId }));
+                if (!hasSupabase) return mine;
+                const ids = [...new Set(ownerIds.filter(Boolean))];
+                if (!ids.length) return mine;
+                const { data, error } = await sb.from("favourites").select("owner_id,owner_name,bar_key,name,lat,lng,source").in("owner_id", ids);
+                if (error) { console.warn("favourites:", error.message); return mine; }
+                return data;
+            },
+            async addFav(f) {
+                const row = { owner_id: deviceId, owner_name: f.owner_name, bar_key: f.bar_key, name: f.name, lat: f.lat, lng: f.lng, source: f.source || "app" };
+                if (hasSupabase) {
+                    const { error } = await sb.from("favourites").upsert(row, { onConflict: "owner_id,bar_key", ignoreDuplicates: true });
+                    if (error) throw error;
+                } else {
+                    const v = localFavs.get().filter(x => x.bar_key !== f.bar_key); v.push(row); localFavs.set(v);
+                }
+            },
+            async addFavs(rows) { // bulk (import)
+                if (hasSupabase) {
+                    for (let i = 0; i < rows.length; i += 200) {
+                        const { error } = await sb.from("favourites").upsert(rows.slice(i, i + 200).map(f => ({ ...f, owner_id: deviceId })), { onConflict: "owner_id,bar_key", ignoreDuplicates: true });
+                        if (error) throw error;
+                    }
+                } else {
+                    const v = localFavs.get(); const keys = new Set(v.map(x => x.bar_key));
+                    rows.forEach(f => { if (!keys.has(f.bar_key)) v.push({ ...f, owner_id: deviceId }); }); localFavs.set(v);
+                }
+            },
+            async removeFav(bar_key) {
+                if (hasSupabase) {
+                    const { error } = await sb.from("favourites").delete().eq("owner_id", deviceId).eq("bar_key", bar_key);
+                    if (error) throw error;
+                } else localFavs.set(localFavs.get().filter(x => x.bar_key !== bar_key));
+            },
+
             // returns plan id (Supabase) or encoded payload (link mode)
             async createPlan(host) {
                 if (hasSupabase) {
@@ -282,13 +344,13 @@
             async join(planId, p) {
                 if (useDb(planId)) {
                     const { data, error } = await sb.from("participants")
-                        .insert({ plan_id: planId, name: p.name, lat: p.lat, lng: p.lng, bike: p.bike }).select().single();
+                        .insert({ plan_id: planId, name: p.name, lat: p.lat, lng: p.lng, bike: p.bike, device_id: deviceId }).select().single();
                     if (error) throw error;
                     return data.id;
                 }
                 // link mode: append to in-memory list and rewrite URL so it can be re-shared
                 const s = b64d(planId) || { h: [] };
-                p.id = "local-" + Date.now();
+                p.id = "local-" + Date.now(); p.device_id = deviceId;
                 s.h.push(p);
                 const url = new URL(location.href);
                 url.searchParams.set("plan", b64e(s));
@@ -298,7 +360,7 @@
             async list(planId) {
                 if (useDb(planId)) {
                     const { data, error } = await sb.from("participants")
-                        .select("id,name,lat,lng,bike,created_at").eq("plan_id", planId).order("created_at");
+                        .select("id,name,lat,lng,bike,device_id,created_at").eq("plan_id", planId).order("created_at");
                     if (error) throw error;
                     return data;
                 }
@@ -413,6 +475,38 @@ out center tags;`;
             return scored;
         }
 
+        // Attach favourites to candidate bars. Starred-in-app favourites always count;
+        // imported (Google) places only count when OpenStreetMap knows a bar there.
+        const norm = (t) => (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+        function mergeFavourites(bars, favs) {
+            const byKey = new Map(bars.map(b => [b.id, b]));
+            bars.forEach(b => b.favBy = []);
+            for (const f of favs) {
+                let bar = byKey.get(f.bar_key);
+                if (!bar) {
+                    let bd = Infinity;
+                    for (const b of bars) {
+                        const d = haversine(b, f);
+                        const nameHit = d < 300 && norm(b.name) && norm(b.name) === norm(f.name);
+                        if ((d < 80 || nameHit) && d < bd) { bd = d; bar = b; }
+                    }
+                }
+                if (!bar && f.source === "app") {
+                    bar = { id: f.bar_key, name: f.name, kind: "favourite", lat: f.lat, lng: f.lng, tags: {}, favBy: [] };
+                    bars.push(bar); byKey.set(bar.id, bar);
+                }
+                if (bar && !bar.favBy.some(x => x.owner_id === f.owner_id)) bar.favBy.push({ owner_id: f.owner_id, name: f.owner_name });
+            }
+            return bars;
+        }
+        // Favourites go first when they are within FAV_TOLERANCE_MIN of the fairest bar.
+        function promoteFavourites(ranked) {
+            if (!ranked.length) return ranked;
+            const limit = ranked[0].worst + CFG.FAV_TOLERANCE_MIN;
+            const fav = ranked.filter(r => r.bar.favBy.length && r.worst <= limit).sort((a, b) => (b.bar.favBy.length - a.bar.favBy.length) || (a.worst - b.worst));
+            return [...fav, ...ranked.filter(r => !fav.includes(r))];
+        }
+
         // Optional: refine top results with real cycling times from OpenRouteService
         async function refineWithORS(top, people) {
             if (!CFG.ORS_KEY) return top;
@@ -479,6 +573,40 @@ out center tags;`;
                 $("open-plan").onclick = () => { const u = new URL(location.href.split("?")[0]); u.searchParams.set("plan", id); u.searchParams.set("view", "1"); location.href = u.toString(); };
             } catch (e) { setStatus("host-status", e.message, "err"); }
             $("host-create").disabled = false;
+        });
+
+        // ── IMPORT (Google Takeout saved places) ──
+        function parseTakeout(text, filename) {
+            const out = [];
+            const push = (name, lat, lng) => { if (name && isFinite(lat) && isFinite(lng)) out.push({ owner_name: "", bar_key: `g:${(+lat).toFixed(5)},${(+lng).toFixed(5)}`, name: String(name).slice(0, 80), lat: +lat, lng: +lng, source: "import" }); };
+            if (/\.(json|geojson)$/i.test(filename)) {
+                const j = JSON.parse(text);
+                (j.features || []).forEach(f => {
+                    const c = f.geometry && f.geometry.coordinates; const p = f.properties || {};
+                    const name = p.name || p.Title || (p.location && p.location.name) || p.title;
+                    if (c && c.length >= 2) push(name, c[1], c[0]);
+                    else if (p.location && p.location.latitude) push(name, p.location.latitude, p.location.longitude);
+                });
+            } else { // CSV: Title,Note,URL,Comment — coordinates only when the URL carries them
+                text.split(/\r?\n/).slice(1).forEach(line => {
+                    const cols = line.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || [];
+                    const title = (cols[0] || "").replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"');
+                    const m = line.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || line.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || line.match(/search\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+                    if (m) push(title, m[1], m[2]);
+                });
+            }
+            return out;
+        }
+        $("import-file").addEventListener("change", async (ev) => {
+            const file = ev.target.files[0]; if (!file) return;
+            const owner = $("host-name").value.trim();
+            if (!owner) { setStatus("import-status", "Type your name above first, so the favourites are yours.", "err"); ev.target.value = ""; return; }
+            try {
+                const rows = parseTakeout(await file.text(), file.name).map(r => ({ ...r, owner_name: owner }));
+                if (!rows.length) return setStatus("import-status", "No places with coordinates found in that file. Use Saved Places.json from Takeout.", "err");
+                await store.addFavs(rows);
+                setStatus("import-status", `Imported ${rows.length} places. Those that match a bar will be suggested first for you.`, "ok");
+            } catch (e) { setStatus("import-status", "Import failed: " + e.message + (/favourites/.test(e.message) ? " — run supabase/002_favourites.sql" : ""), "err"); }
         });
 
         // ── INVITE (original game) ──
@@ -581,12 +709,17 @@ out center tags;`;
                 const spread = Math.max(...people.map(p => haversine(center, p)));
                 const barRadius = Math.min(4000, Math.max(700, spread * 0.7 + 400));
                 const stationRadius = Math.min(20000, spread + 2000);
-                const { bars, stations } = await fetchOSM(center, barRadius, stationRadius);
+                const osm = await fetchOSM(center, barRadius, stationRadius);
+                const stations = osm.stations;
+                const favs = await store.favsFor(people.map(p => p.device_id)).catch(e => { console.warn("favourites:", e.message); return []; });
+                const bars = mergeFavourites(osm.bars.map(b => ({ ...b })), favs);
+                const myKeys = new Set(favs.filter(f => f.owner_id === deviceId).map(f => f.bar_key));
+                const me = people.find(p => p.device_id === deviceId);
                 if (!bars.length) { $("bars").innerHTML = ""; return setStatus("plan-status", "No bars found in between on OpenStreetMap. Try again later or widen the search.", "err"); }
 
-                let ranked = rankBars(people, bars, stations).slice(0, 6);
+                let ranked = promoteFavourites(rankBars(people, bars, stations)).slice(0, 6);
                 ranked = await refineWithORS(ranked, people);
-                ranked = ranked.slice(0, 5);
+                ranked = promoteFavourites(ranked).slice(0, 5);
 
                 if (hasMap()) {
                 stations.forEach(s => L.circleMarker([s.lat, s.lng], { radius: 3, color: "#3498db", fillOpacity: .9 }).bindTooltip(esc(s.name)).addTo(layer));
@@ -596,8 +729,9 @@ out center tags;`;
 
                 $("bars").innerHTML = ranked.map((r, i) => `
                     <div class="bar ${i === 0 ? "top" : ""}">
-                        <span class="rank">${i === 0 ? "⭐ Fairest" : "#" + (i + 1)}</span>
-                        <h3>${esc(r.bar.name)}</h3>
+                        <span class="rank">${i === 0 ? (r.bar.favBy.length ? "⭐ Favourite & fair" : "🏆 Fairest") : "#" + (i + 1)}</span>
+                        ${me ? `<button class="star ${myKeys.has(r.bar.id) ? "on" : ""}" data-key="${esc(r.bar.id)}" title="${myKeys.has(r.bar.id) ? "Remove from my favourites" : "Add to my favourites"}">${myKeys.has(r.bar.id) ? "★" : "☆"}</button>` : ""}
+                        <h3>${esc(r.bar.name)}${r.bar.favBy.map(f => `<span class="favtag">⭐ ${esc(f.name)}${f.owner_id === deviceId ? " (you)" : ""}</span>`).join("")}</h3>
                         <div class="meta">${esc(r.bar.kind)}${r.bar.tags["addr:street"] ? " · " + esc((r.bar.tags["addr:housenumber"] || "") + " " + r.bar.tags["addr:street"]).trim() : ""}
                             · longest trip ≈ ${fmt(r.worst)}
                             · <a href="https://www.openstreetmap.org/?mlat=${r.bar.lat}&mlon=${r.bar.lng}#map=18/${r.bar.lat}/${r.bar.lng}" target="_blank" rel="noopener">map</a></div>
@@ -615,6 +749,15 @@ out center tags;`;
                         </div>
                     </div>`).join("");
                 setStatus("plan-status", `${bars.length} bars · ${stations.length} stations considered`, "ok");
+                $("bars").querySelectorAll(".star").forEach(btn => btn.onclick = async () => {
+                    const key = btn.dataset.key, r = ranked.find(x => x.bar.id === key);
+                    btn.disabled = true;
+                    try {
+                        if (myKeys.has(key)) await store.removeFav(key);
+                        else await store.addFav({ owner_name: me.name, bar_key: key, name: r.bar.name, lat: r.bar.lat, lng: r.bar.lng, source: "app" });
+                        await refreshPlan(id, true);
+                    } catch (e) { setStatus("plan-status", "Couldn't save favourite: " + e.message + (/device_id|favourites/.test(e.message) ? " — run supabase/002_favourites.sql" : ""), "err"); btn.disabled = false; }
+                });
             } catch (e) {
                 setStatus("plan-status", "Couldn't compute suggestions: " + e.message, "err");
             }
