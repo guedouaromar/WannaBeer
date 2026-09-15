@@ -4,8 +4,8 @@
 // 3. Paste the Project URL and the anon public key below (Settings → API)
 // Leave both empty to run in "link-only" mode (1-on-1, no server).
 window.WANNABEER_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_URL: "https://hjmdtymiirgzgvonjntj.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_HIMcZih8QEXPdkK5YCeGQw_xJOdxFSj",
 
   // Optional: OpenRouteService key (https://openrouteservice.org, free tier)
   // to replace the cycling time estimate with real routed cycling times.
