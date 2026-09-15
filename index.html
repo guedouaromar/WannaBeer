@@ -263,6 +263,11 @@
         const b64e = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
         const b64d = (s) => { try { return JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))))); } catch { return null; } };
 
+        // Links created in link-only mode carry an encoded payload instead of a UUID;
+        // keep honouring them even after Supabase is configured.
+        const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || "");
+        const useDb = (id) => hasSupabase && isUuid(id);
+
         const store = {
             // returns plan id (Supabase) or encoded payload (link mode)
             async createPlan(host) {
@@ -275,7 +280,7 @@
                 return b64e({ h: [host] });
             },
             async join(planId, p) {
-                if (hasSupabase) {
+                if (useDb(planId)) {
                     const { data, error } = await sb.from("participants")
                         .insert({ plan_id: planId, name: p.name, lat: p.lat, lng: p.lng, bike: p.bike }).select().single();
                     if (error) throw error;
@@ -291,7 +296,7 @@
                 return p.id;
             },
             async list(planId) {
-                if (hasSupabase) {
+                if (useDb(planId)) {
                     const { data, error } = await sb.from("participants")
                         .select("id,name,lat,lng,bike,created_at").eq("plan_id", planId).order("created_at");
                     if (error) throw error;
@@ -301,7 +306,7 @@
                 return s.h;
             },
             async hostName(planId) {
-                if (hasSupabase) {
+                if (useDb(planId)) {
                     const { data } = await sb.from("plans").select("host_name").eq("id", planId).single();
                     return data ? data.host_name : null;
                 }
@@ -535,7 +540,7 @@ out center tags;`;
             $("plan-refresh").onclick = () => refreshPlan(id, true);
             store.hostName(id).then(h => { if (h) $("plan-title").textContent = `${h}'s beer plan 🍻`; });
             await refreshPlan(id, true);
-            if (hasSupabase) {
+            if (useDb(id)) {
                 clearInterval(pollTimer);
                 pollTimer = setInterval(() => refreshPlan(id, false), 5000);
                 try { // realtime, if enabled on the table
